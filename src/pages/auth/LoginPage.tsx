@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, CircleDollarSign, Building2, LogIn, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { authAPI } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { UserRole } from '../../types';
@@ -23,7 +24,6 @@ export const LoginPage: React.FC = () => {
     
     try {
       await login(email, password, role);
-      // Redirect based on user role
       navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
     } catch (err) {
       setError((err as Error).message);
@@ -31,16 +31,45 @@ export const LoginPage: React.FC = () => {
     }
   };
   
-  // For demo purposes, pre-filled credentials
-  const fillDemoCredentials = (userRole: UserRole) => {
-    if (userRole === 'entrepreneur') {
-      setEmail('sarah@techwave.io');
-      setPassword('password123');
-    } else {
-      setEmail('michael@vcinnovate.com');
-      setPassword('password123');
-    }
+  // Demo credentials - auto-register if not exists
+  const handleDemoLogin = async (userRole: UserRole) => {
+    setError(null);
+    setIsLoading(true);
+    
+    const demoEmail = userRole === 'entrepreneur' 
+      ? 'sarah@techwave.io' 
+      : 'michael@vcinnovate.com';
+    const demoPassword = 'password123';
+    const demoName = userRole === 'entrepreneur' 
+      ? 'Sarah Chen' 
+      : 'Michael Rodriguez';
+    
+    setEmail(demoEmail);
+    setPassword(demoPassword);
     setRole(userRole);
+    
+    try {
+      // Try to login first
+      await login(demoEmail, demoPassword, userRole);
+      navigate(userRole === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+    } catch {
+      // If login fails, auto-register the demo account
+      try {
+        await authAPI.register({
+          name: demoName,
+          email: demoEmail,
+          password: demoPassword,
+          role: userRole
+        });
+        
+        // Now login with the newly created account
+        await login(demoEmail, demoPassword, userRole);
+        navigate(userRole === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+      } catch {
+        setError('Failed to create demo account. Please try again.');
+        setIsLoading(false);
+      }
+    }
   };
   
   return (
@@ -167,7 +196,7 @@ export const LoginPage: React.FC = () => {
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Button
                 variant="outline"
-                onClick={() => fillDemoCredentials('entrepreneur')}
+                onClick={() => handleDemoLogin('entrepreneur')}
                 leftIcon={<Building2 size={16} />}
               >
                 Entrepreneur Demo
@@ -175,7 +204,7 @@ export const LoginPage: React.FC = () => {
               
               <Button
                 variant="outline"
-                onClick={() => fillDemoCredentials('investor')}
+                onClick={() => handleDemoLogin('investor')}
                 leftIcon={<CircleDollarSign size={16} />}
               >
                 Investor Demo
