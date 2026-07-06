@@ -9,18 +9,32 @@ import { InvestorCard } from '../../components/investor/InvestorCard';
 import { useAuth } from '../../context/AuthContext';
 import { CollaborationRequest } from '../../types';
 import { getRequestsForEntrepreneur } from '../../data/collaborationRequests';
-import { investors } from '../../data/users';
+import { profileAPI } from '../../services/api';
 
 export const EntrepreneurDashboard: React.FC = () => {
   const { user } = useAuth();
   const [collaborationRequests, setCollaborationRequests] = useState<CollaborationRequest[]>([]);
-  const [recommendedInvestors, setRecommendedInvestors] = useState(investors.slice(0, 3));
+  const [recommendedInvestors, setRecommendedInvestors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     if (user) {
-      // Load collaboration requests
+      // Load collaboration requests (still mock for now)
       const requests = getRequestsForEntrepreneur(user.id);
       setCollaborationRequests(requests);
+      
+      // Fetch real investors from backend
+      const fetchInvestors = async () => {
+        try {
+          const data = await profileAPI.getAllProfiles('investor');
+          setRecommendedInvestors(data.profiles.slice(0, 3));
+        } catch (error) {
+          console.error('Failed to fetch investors:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchInvestors();
     }
   }, [user]);
   
@@ -147,7 +161,7 @@ export const EntrepreneurDashboard: React.FC = () => {
           </Card>
         </div>
         
-        {/* Recommended investors */}
+        {/* Recommended investors - REAL DATA */}
         <div className="space-y-4">
           <Card>
             <CardHeader className="flex justify-between items-center">
@@ -158,13 +172,37 @@ export const EntrepreneurDashboard: React.FC = () => {
             </CardHeader>
             
             <CardBody className="space-y-4">
-              {recommendedInvestors.map(investor => (
-                <InvestorCard
-                  key={investor.id}
-                  investor={investor}
-                  showActions={false}
-                />
-              ))}
+              {loading ? (
+                <p className="text-gray-500 text-center py-4">Loading investors...</p>
+              ) : recommendedInvestors.length > 0 ? (
+                recommendedInvestors.map((investor: any) => (
+                  <div key={investor.user.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center mb-2">
+                      <img 
+                        src={investor.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(investor.user.name)}&background=random`} 
+                        alt={investor.user.name}
+                        className="w-10 h-10 rounded-full mr-3"
+                      />
+                      <div>
+                        <h3 className="font-medium text-gray-900">{investor.user.name}</h3>
+                        <p className="text-sm text-gray-500">Investor</p>
+                      </div>
+                    </div>
+                    {investor.investmentInterests && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {JSON.parse(investor.investmentInterests || '[]').map((interest: string, idx: number) => (
+                          <span key={idx} className="px-2 py-1 bg-primary-50 text-primary-700 text-xs rounded-full">
+                            {interest}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-sm text-gray-600 mt-2 line-clamp-2">{investor.user.bio || 'No bio available'}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 text-center py-4">No investors found</p>
+              )}
             </CardBody>
           </Card>
         </div>
