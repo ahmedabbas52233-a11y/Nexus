@@ -6,7 +6,7 @@ const db = new sqlite3.Database(dbPath);
 
 console.log('SQLite database connected at:', dbPath);
 
-// CRITICAL: Force ALL queries to run sequentially
+// CRITICAL: Enable serialized mode for ALL queries (not inside a block)
 db.serialize();
 
 // Create tables sequentially
