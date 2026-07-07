@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ChatUserList } from '../../components/chat/ChatUserList';
-import { profileAPI } from '../../services/api';
+import { profileAPI } from '../../Services/api';
 import { ChatConversation } from '../../types';
 
 interface ApiProfile {

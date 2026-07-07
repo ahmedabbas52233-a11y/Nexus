@@ -5,7 +5,7 @@ import { ChatConversation } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { useAuth } from '../../context/AuthContext';
-import { profileAPI } from '../../services/api';
+import { profileAPI } from '../../Services/api';
 
 interface ChatUserListProps {
   conversations: ChatConversation[];

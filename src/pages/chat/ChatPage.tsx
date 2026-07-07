@@ -1,62 +1,146 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import { Send, Phone, Video, Info, Smile } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Send, Phone, Video, Info, Smile, ArrowLeft, MessageCircle } from 'lucide-react';
 import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ChatMessage } from '../../components/chat/ChatMessage';
 import { ChatUserList } from '../../components/chat/ChatUserList';
 import { useAuth } from '../../context/AuthContext';
-import { Message } from '../../types';
-import { findUserById } from '../../data/users';
-import { getMessagesBetweenUsers, sendMessage, getConversationsForUser } from '../../data/messages';
-import { MessageCircle } from 'lucide-react';
+import { ChatConversation } from '../../types';
+import { profileAPI } from '../../Services/api';
+
+interface ChatMessageData {
+  id: string;
+  senderId: string;
+  content: string;
+  timestamp: string;
+  isRead: boolean;
+}
+
+interface UserProfile {
+  id: number;
+  name: string;
+  avatarUrl: string;
+  isOnline?: boolean;
+  role?: string;
+}
 
 export const ChatPage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const { user: currentUser } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const navigate = useNavigate();
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  
+  const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [conversations, setConversations] = useState<any[]>([]);
-  const messagesEndRef = useRef<null | HTMLDivElement>(null);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [chatPartner, setChatPartner] = useState<UserProfile | null>(null);
+  const [loadingPartner, setLoadingPartner] = useState(false);
   
-  const chatPartner = userId ? findUserById(userId) : null;
-  
+  // Load conversations list
   useEffect(() => {
-    // Load conversations
-    if (currentUser) {
-      setConversations(getConversationsForUser(currentUser.id));
-    }
+    if (!currentUser) return;
+    
+    const loadConversations = async () => {
+      try {
+        const targetRole = currentUser.role === 'entrepreneur' ? 'investor' : 'entrepreneur';
+        const data = await profileAPI.getAllProfiles(targetRole);
+        
+        const convos: ChatConversation[] = data.profiles.map((profile: Record<string, unknown>) => {
+          const profileId = String(profile.userId || profile.id || 0);
+          return {
+            id: profileId,
+            participants: [String(currentUser.id), profileId],
+            lastMessage: {
+              content: 'Click to start a conversation',
+              timestamp: new Date().toISOString(),
+              isRead: true,
+              senderId: String(currentUser.id)
+            },
+            unreadCount: 0,
+            updatedAt: new Date().toISOString()
+          };
+        });
+        
+        setConversations(convos);
+      } catch (err) {
+        console.error('Failed to load conversations:', err);
+      }
+    };
+    
+    loadConversations();
   }, [currentUser]);
   
+  // Load chat partner when userId changes
   useEffect(() => {
-    // Load messages between users
-    if (currentUser && userId) {
-      setMessages(getMessagesBetweenUsers(currentUser.id, userId));
+    if (!userId) {
+      setChatPartner(null);
+      return;
     }
-  }, [currentUser, userId]);
+    
+    const fetchPartner = async () => {
+      setLoadingPartner(true);
+      try {
+        const profile = await profileAPI.getProfileById(userId);
+        setChatPartner({
+          id: Number(userId),
+          name: String(profile.name || 'Unknown'),
+          avatarUrl: String(profile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(String(profile.name || 'Unknown'))}&background=random`),
+          isOnline: Boolean(profile.isOnline),
+          role: String(profile.role || '')
+        });
+      } catch (err) {
+        console.error('Failed to fetch partner:', err);
+        setChatPartner({
+          id: Number(userId),
+          name: 'Unknown User',
+          avatarUrl: `https://ui-avatars.com/api/?name=Unknown&background=random`,
+          isOnline: false
+        });
+      } finally {
+        setLoadingPartner(false);
+      }
+    };
+    
+    fetchPartner();
+  }, [userId]);
   
   useEffect(() => {
-    // Scroll to bottom of messages
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
   
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!newMessage.trim() || !currentUser || !userId) return;
     
-    const message = sendMessage({
-      senderId: currentUser.id,
-      receiverId: userId,
-      content: newMessage
-    });
+    const message: ChatMessageData = {
+      id: Date.now().toString(),
+      senderId: String(currentUser.id),
+      content: newMessage.trim(),
+      timestamp: new Date().toISOString(),
+      isRead: false
+    };
     
-    setMessages([...messages, message]);
+    setMessages(prev => [...prev, message]);
     setNewMessage('');
     
-    // Update conversations
-    setConversations(getConversationsForUser(currentUser.id));
+    // Update conversation last message
+    setConversations(prev => prev.map(c => 
+      c.id === userId ? {
+        ...c,
+        lastMessage: {
+          id: message.id,
+          senderId: String(currentUser.id),
+          receiverId: userId,
+          content: message.content,
+          timestamp: message.timestamp,
+          isRead: false,
+          status: 'sent'
+        },
+        updatedAt: message.timestamp
+      } : c
+    ));
   };
   
   if (!currentUser) return null;
@@ -70,58 +154,56 @@ export const ChatPage: React.FC = () => {
       
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">
-        {/* Chat header */}
-        {chatPartner ? (
+        {userId ? (
           <>
             <div className="border-b border-gray-200 p-4 flex justify-between items-center">
               <div className="flex items-center">
-                <Avatar
-                  src={chatPartner.avatarUrl}
-                  alt={chatPartner.name}
-                  size="md"
-                  status={chatPartner.isOnline ? 'online' : 'offline'}
-                  className="mr-3"
-                />
+                <button 
+                  onClick={() => navigate('/messages')}
+                  className="md:hidden mr-3 p-1 hover:bg-gray-100 rounded"
+                  title="Back to messages"
+                  type="button"
+                >
+                  <ArrowLeft size={20} className="text-gray-600" />
+                </button>
                 
-                <div>
-                  <h2 className="text-lg font-medium text-gray-900">{chatPartner.name}</h2>
-                  <p className="text-sm text-gray-500">
-                    {chatPartner.isOnline ? 'Online' : 'Last seen recently'}
-                  </p>
-                </div>
+                {loadingPartner || !chatPartner ? (
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse mr-3" />
+                    <div className="h-4 w-24 bg-gray-200 animate-pulse rounded" />
+                  </div>
+                ) : (
+                  <>
+                    <Avatar
+                      src={chatPartner.avatarUrl}
+                      alt={chatPartner.name}
+                      size="md"
+                      status={chatPartner.isOnline ? 'online' : 'offline'}
+                      className="mr-3"
+                    />
+                    <div>
+                      <h2 className="text-lg font-medium text-gray-900">{chatPartner.name}</h2>
+                      <p className="text-sm text-gray-500">
+                        {chatPartner.isOnline ? 'Online' : 'Offline'}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
               
               <div className="flex space-x-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full p-2"
-                  aria-label="Voice call"
-                >
+                <Button variant="ghost" size="sm" className="rounded-full p-2" title="Voice call">
                   <Phone size={18} />
                 </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full p-2"
-                  aria-label="Video call"
-                >
+                <Button variant="ghost" size="sm" className="rounded-full p-2" title="Video call">
                   <Video size={18} />
                 </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full p-2"
-                  aria-label="Info"
-                >
+                <Button variant="ghost" size="sm" className="rounded-full p-2" title="Info">
                   <Info size={18} />
                 </Button>
               </div>
             </div>
             
-            {/* Messages container */}
             <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
               {messages.length > 0 ? (
                 <div className="space-y-4">
@@ -129,7 +211,7 @@ export const ChatPage: React.FC = () => {
                     <ChatMessage
                       key={message.id}
                       message={message}
-                      isCurrentUser={message.senderId === currentUser.id}
+                      isCurrentUser={message.senderId === String(currentUser.id)}
                     />
                   ))}
                   <div ref={messagesEndRef} />
@@ -145,19 +227,11 @@ export const ChatPage: React.FC = () => {
               )}
             </div>
             
-            {/* Message input */}
             <div className="border-t border-gray-200 p-4">
               <form onSubmit={handleSendMessage} className="flex space-x-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full p-2"
-                  aria-label="Add emoji"
-                >
+                <Button type="button" variant="ghost" size="sm" className="rounded-full p-2" title="Add emoji">
                   <Smile size={20} />
                 </Button>
-                
                 <Input
                   type="text"
                   placeholder="Type a message..."
@@ -166,13 +240,12 @@ export const ChatPage: React.FC = () => {
                   fullWidth
                   className="flex-1"
                 />
-                
                 <Button
                   type="submit"
                   size="sm"
                   disabled={!newMessage.trim()}
                   className="rounded-full p-2 w-10 h-10 flex items-center justify-center"
-                  aria-label="Send message"
+                  title="Send message"
                 >
                   <Send size={18} />
                 </Button>

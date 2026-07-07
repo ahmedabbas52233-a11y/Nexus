@@ -8,7 +8,7 @@ import { CollaborationRequestCard } from '../../components/collaboration/Collabo
 import { useAuth } from '../../context/AuthContext';
 import { CollaborationRequest } from '../../types';
 import { getRequestsForEntrepreneur } from '../../data/collaborationRequests';
-import { profileAPI } from '../../services/api';
+import { profileAPI } from '../../Services/api';
 
 interface InvestorProfile {
   id: number;

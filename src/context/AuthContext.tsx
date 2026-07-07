@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { User, UserRole, AuthContextType } from '../types';
-import { authAPI } from '../services/api';
+import { authAPI } from '../Services/api';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -12,7 +12,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for stored token and validate on load
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -20,17 +19,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (token && storedUser) {
         try {
-          // Validate token with backend
           const data = await authAPI.getMe();
           if (data.success) {
             setUser(data.user);
             localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
           } else {
-            // Token invalid, clear storage
             localStorage.removeItem(TOKEN_STORAGE_KEY);
             localStorage.removeItem(USER_STORAGE_KEY);
           }
-        } catch (error) {
+        } catch {
           localStorage.removeItem(TOKEN_STORAGE_KEY);
           localStorage.removeItem(USER_STORAGE_KEY);
         }
@@ -48,7 +45,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await authAPI.login({ email, password });
       
       if (data.success) {
-        // Check if role matches
         if (data.user.role !== role) {
           throw new Error(`This account is registered as a ${data.user.role}, not ${role}`);
         }
@@ -90,9 +86,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const forgotPassword = async (email: string): Promise<void> => {
+  const forgotPassword = async (_email: string): Promise<void> => {
     try {
-      // Mock for now - no email backend
       await new Promise(resolve => setTimeout(resolve, 1000));
       toast.success('Password reset instructions sent to your email (mock)');
     } catch (error) {
@@ -101,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+  const resetPassword = async (_token: string, _newPassword: string): Promise<void> => {
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
       toast.success('Password reset successfully (mock)');
@@ -111,18 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = (): void => {
-    authAPI.logout().catch(() => {}); // Don't wait for response
-    setUser(null);
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
-    toast.success('Logged out successfully');
-  };
-
-  const updateProfile = async (userId: string, updates: Partial<User>): Promise<void> => {
+  const updateProfile = async (_userId: string, updates: Partial<User>): Promise<void> => {
     try {
-      // For now, just update local state
-      // In full implementation, call profileAPI.updateProfile
       setUser(prev => prev ? { ...prev, ...updates } : null);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify({ ...user, ...updates }));
       toast.success('Profile updated successfully');
@@ -130,6 +115,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error((error as Error).message);
       throw error;
     }
+  };
+
+  const logout = (): void => {
+    authAPI.logout().catch(() => {});
+    setUser(null);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    toast.success('Logged out successfully');
   };
 
   const value = {
