@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 
@@ -30,7 +30,7 @@ import { DealsPage } from './pages/deals/DealsPage';
 // Chat Pages
 import { ChatPage } from './pages/chat/ChatPage';
 
-function App() {
+const App: FC = () => {
   return (
     <AuthProvider>
       <Router>
@@ -99,6 +99,6 @@ function App() {
       </Router>
     </AuthProvider>
   );
-}
+};
 
 export default App;

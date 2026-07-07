@@ -29,15 +29,28 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   return data;
 };
 
+// Auth types
+interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+}
+
+interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
 // Auth APIs
 export const authAPI = {
-  register: (userData: { name: string; email: string; password: string; role: string }) => 
+  register: (userData: RegisterData) => 
     fetchWithAuth('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     }),
 
-  login: (credentials: { email: string; password: string }) => 
+  login: (credentials: LoginCredentials) => 
     fetchWithAuth('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
@@ -52,7 +65,7 @@ export const authAPI = {
 export const profileAPI = {
   getMyProfile: () => fetchWithAuth('/profiles/me'),
   
-  updateProfile: (profileData: any) => 
+  updateProfile: (profileData: Record<string, unknown>) => 
     fetchWithAuth('/profiles/me', {
       method: 'PUT',
       body: JSON.stringify(profileData),
@@ -64,9 +77,19 @@ export const profileAPI = {
   getProfileById: (userId: string) => fetchWithAuth(`/profiles/${userId}`),
 };
 
+// Meeting types
+interface MeetingData {
+  title?: string;
+  description?: string;
+  startTime?: string;
+  endTime?: string;
+  recipientId?: number;
+  [key: string]: unknown;
+}
+
 // Meeting APIs
 export const meetingAPI = {
-  createMeeting: (meetingData: any) => 
+  createMeeting: (meetingData: MeetingData) => 
     fetchWithAuth('/meetings', {
       method: 'POST',
       body: JSON.stringify(meetingData),
@@ -103,13 +126,32 @@ export const documentAPI = {
   getAllDocuments: () => fetchWithAuth('/documents/all'),
 };
 
+// Transaction types
+interface TransactionData {
+  type?: string;
+  amount?: number;
+  description?: string;
+  [key: string]: unknown;
+}
+
 // Transaction APIs
 export const transactionAPI = {
-  createTransaction: (data: any) => 
+  createTransaction: (data: TransactionData) => 
     fetchWithAuth('/transactions', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   getMyTransactions: () => fetchWithAuth('/transactions'),
+};
+
+// Messages API (placeholder - backend not implemented yet)
+export const messageAPI = {
+  getConversations: () => fetchWithAuth('/messages/conversations'),
+  getMessages: (userId: string) => fetchWithAuth(`/messages/${userId}`),
+  sendMessage: (userId: string, content: string) => 
+    fetchWithAuth(`/messages/${userId}`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
 };

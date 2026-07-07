@@ -1,20 +1,73 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { ChatConversation } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
-import { findUserById } from '../../data/users';
 import { useAuth } from '../../context/AuthContext';
+import { profileAPI } from '../../services/api';
 
 interface ChatUserListProps {
   conversations: ChatConversation[];
+}
+
+interface CachedUser {
+  name: string;
+  avatarUrl: string;
+  isOnline?: boolean;
 }
 
 export const ChatUserList: React.FC<ChatUserListProps> = ({ conversations }) => {
   const navigate = useNavigate();
   const { userId: activeUserId } = useParams<{ userId: string }>();
   const { user: currentUser } = useAuth();
+  const [userCache, setUserCache] = useState<Record<string, CachedUser>>({});
+  
+  useEffect(() => {
+    if (!currentUser || conversations.length === 0) return;
+    
+    const fetchMissingUsers = async () => {
+      const missingIds: string[] = [];
+      
+      for (const conversation of conversations) {
+        const otherId = conversation.participants.find(id => String(id) !== String(currentUser.id));
+        if (!otherId) continue;
+        const key = String(otherId);
+        if (!userCache[key]) {
+          missingIds.push(key);
+        }
+      }
+      
+      if (missingIds.length === 0) return;
+      
+      // Fetch all missing users
+      for (const userId of missingIds) {
+        try {
+          const profile = await profileAPI.getProfileById(userId);
+          setUserCache(prev => ({
+            ...prev,
+            [userId]: {
+              name: profile.name || 'Unknown',
+              avatarUrl: profile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'Unknown')}&background=random`,
+              isOnline: profile.isOnline
+            }
+          }));
+        } catch {
+          setUserCache(prev => ({
+            ...prev,
+            [userId]: {
+              name: 'Unknown User',
+              avatarUrl: `https://ui-avatars.com/api/?name=Unknown&background=random`,
+              isOnline: false
+            }
+          }));
+        }
+      }
+    };
+    
+    fetchMissingUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, currentUser]);
   
   if (!currentUser) return null;
   
@@ -30,15 +83,14 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({ conversations }) => 
         <div className="space-y-1">
           {conversations.length > 0 ? (
             conversations.map(conversation => {
-              // Get the other participant (not the current user)
-              const otherParticipantId = conversation.participants.find(id => id !== currentUser.id);
+              const otherParticipantId = conversation.participants.find(
+                id => String(id) !== String(currentUser.id)
+              );
               if (!otherParticipantId) return null;
               
-              const otherUser = findUserById(otherParticipantId);
-              if (!otherUser) return null;
-              
+              const otherUser = userCache[String(otherParticipantId)];
               const lastMessage = conversation.lastMessage;
-              const isActive = activeUserId === otherParticipantId;
+              const isActive = activeUserId === String(otherParticipantId);
               
               return (
                 <div
@@ -48,20 +100,24 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({ conversations }) => 
                       ? 'bg-primary-50 border-l-4 border-primary-600'
                       : 'hover:bg-gray-50 border-l-4 border-transparent'
                   }`}
-                  onClick={() => handleSelectUser(otherUser.id)}
+                  onClick={() => handleSelectUser(String(otherParticipantId))}
                 >
-                  <Avatar
-                    src={otherUser.avatarUrl}
-                    alt={otherUser.name}
-                    size="md"
-                    status={otherUser.isOnline ? 'online' : 'offline'}
-                    className="mr-3 flex-shrink-0"
-                  />
+                  {otherUser ? (
+                    <Avatar
+                      src={otherUser.avatarUrl}
+                      alt={otherUser.name}
+                      size="md"
+                      status={otherUser.isOnline ? 'online' : 'offline'}
+                      className="mr-3 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse mr-3 flex-shrink-0" />
+                  )}
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline">
                       <h3 className="text-sm font-medium text-gray-900 truncate">
-                        {otherUser.name}
+                        {otherUser?.name || 'Loading...'}
                       </h3>
                       
                       {lastMessage && (
@@ -74,12 +130,12 @@ export const ChatUserList: React.FC<ChatUserListProps> = ({ conversations }) => 
                     <div className="flex justify-between items-center mt-1">
                       {lastMessage && (
                         <p className="text-xs text-gray-600 truncate">
-                          {lastMessage.senderId === currentUser.id ? 'You: ' : ''}
+                          {String(lastMessage.senderId) === String(currentUser.id) ? 'You: ' : ''}
                           {lastMessage.content}
                         </p>
                       )}
                       
-                      {lastMessage && !lastMessage.isRead && lastMessage.senderId !== currentUser.id && (
+                      {lastMessage && !lastMessage.isRead && String(lastMessage.senderId) !== String(currentUser.id) && (
                         <Badge variant="primary" size="sm" rounded>New</Badge>
                       )}
                     </div>

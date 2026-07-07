@@ -1,14 +1,28 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, ExternalLink } from 'lucide-react';
-import { Entrepreneur } from '../../types';
 import { Card, CardBody, CardFooter } from '../ui/Card';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 
+interface EntrepreneurProfile {
+  id?: number;
+  userId?: number;
+  name?: string;
+  avatarUrl?: string;
+  isOnline?: boolean;
+  startupName?: string;
+  industry?: string;
+  location?: string;
+  foundedYear?: number;
+  pitchSummary?: string;
+  fundingNeeded?: string;
+  teamSize?: number;
+}
+
 interface EntrepreneurCardProps {
-  entrepreneur: Entrepreneur;
+  entrepreneur: EntrepreneurProfile;
   showActions?: boolean;
 }
 
@@ -18,13 +32,15 @@ export const EntrepreneurCard: React.FC<EntrepreneurCardProps> = ({
 }) => {
   const navigate = useNavigate();
   
+  const entrepreneurId = entrepreneur.userId || entrepreneur.id;
+  
   const handleViewProfile = () => {
-    navigate(`/profile/entrepreneur/${entrepreneur.id}`);
+    navigate(`/profile/entrepreneur/${entrepreneurId}`);
   };
   
   const handleMessage = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
-    navigate(`/chat/${entrepreneur.id}`);
+    e.stopPropagation();
+    navigate(`/chat/${entrepreneurId}`);
   };
   
   return (
@@ -36,39 +52,39 @@ export const EntrepreneurCard: React.FC<EntrepreneurCardProps> = ({
       <CardBody className="flex flex-col">
         <div className="flex items-start">
           <Avatar
-            src={entrepreneur.avatarUrl}
-            alt={entrepreneur.name}
+            src={entrepreneur.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(entrepreneur.name || '')}&background=random`}
+            alt={entrepreneur.name || 'Unknown'}
             size="lg"
             status={entrepreneur.isOnline ? 'online' : 'offline'}
             className="mr-4"
           />
           
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">{entrepreneur.name}</h3>
-            <p className="text-sm text-gray-500 mb-2">{entrepreneur.startupName}</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">{entrepreneur.name || 'Unknown'}</h3>
+            <p className="text-sm text-gray-500 mb-2">{entrepreneur.startupName || 'Unnamed Startup'}</p>
             
             <div className="flex flex-wrap gap-2 mb-3">
-              <Badge variant="primary" size="sm">{entrepreneur.industry}</Badge>
-              <Badge variant="gray" size="sm">{entrepreneur.location}</Badge>
-              <Badge variant="accent" size="sm">Founded {entrepreneur.foundedYear}</Badge>
+              {entrepreneur.industry && <Badge variant="primary" size="sm">{entrepreneur.industry}</Badge>}
+              {entrepreneur.location && <Badge variant="gray" size="sm">{entrepreneur.location}</Badge>}
+              {entrepreneur.foundedYear && entrepreneur.foundedYear > 0 && <Badge variant="accent" size="sm">Founded {entrepreneur.foundedYear}</Badge>}
             </div>
           </div>
         </div>
         
         <div className="mt-3">
           <h4 className="text-sm font-medium text-gray-900 mb-1">Pitch Summary</h4>
-          <p className="text-sm text-gray-600 line-clamp-3">{entrepreneur.pitchSummary}</p>
+          <p className="text-sm text-gray-600 line-clamp-3">{entrepreneur.pitchSummary || 'No pitch summary available'}</p>
         </div>
         
         <div className="mt-3 flex justify-between items-center">
           <div>
             <span className="text-xs text-gray-500">Funding Need</span>
-            <p className="text-sm font-medium text-gray-900">{entrepreneur.fundingNeeded}</p>
+            <p className="text-sm font-medium text-gray-900">{entrepreneur.fundingNeeded || 'N/A'}</p>
           </div>
           
           <div>
             <span className="text-xs text-gray-500">Team Size</span>
-            <p className="text-sm font-medium text-gray-900">{entrepreneur.teamSize} people</p>
+            <p className="text-sm font-medium text-gray-900">{entrepreneur.teamSize || 0} people</p>
           </div>
         </div>
       </CardBody>

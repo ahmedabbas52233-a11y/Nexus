@@ -5,31 +5,51 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { CollaborationRequestCard } from '../../components/collaboration/CollaborationRequestCard';
-import { InvestorCard } from '../../components/investor/InvestorCard';
 import { useAuth } from '../../context/AuthContext';
 import { CollaborationRequest } from '../../types';
 import { getRequestsForEntrepreneur } from '../../data/collaborationRequests';
 import { profileAPI } from '../../services/api';
 
+interface InvestorProfile {
+  id: number;
+  userId: number;
+  name: string;
+  email: string;
+  role: string;
+  avatarUrl?: string;
+  bio?: string;
+  isOnline?: boolean;
+  investmentInterests?: string[];
+  investmentStage?: string[];
+  minimumInvestment?: string;
+  maximumInvestment?: string;
+  totalInvestments?: number;
+  location?: string;
+}
+
 export const EntrepreneurDashboard: React.FC = () => {
   const { user } = useAuth();
   const [collaborationRequests, setCollaborationRequests] = useState<CollaborationRequest[]>([]);
-  const [recommendedInvestors, setRecommendedInvestors] = useState<any[]>([]);
+  const [recommendedInvestors, setRecommendedInvestors] = useState<InvestorProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     if (user) {
-      // Load collaboration requests (still mock for now)
-      const requests = getRequestsForEntrepreneur(user.id);
-      setCollaborationRequests(requests);
+      try {
+        const requests = getRequestsForEntrepreneur(user.id);
+        setCollaborationRequests(requests);
+      } catch (err) {
+        console.error('Error loading collaboration requests:', err);
+      }
       
-      // Fetch real investors from backend
       const fetchInvestors = async () => {
         try {
           const data = await profileAPI.getAllProfiles('investor');
           setRecommendedInvestors(data.profiles.slice(0, 3));
-        } catch (error) {
-          console.error('Failed to fetch investors:', error);
+        } catch (err) {
+          console.error('Failed to fetch investors:', err);
+          setError('Failed to load investors');
         } finally {
           setLoading(false);
         }
@@ -46,7 +66,9 @@ export const EntrepreneurDashboard: React.FC = () => {
     );
   };
   
-  if (!user) return null;
+  if (!user) {
+    return <div className="p-8 text-center">Loading user...</div>;
+  }
   
   const pendingRequests = collaborationRequests.filter(req => req.status === 'pending');
   
@@ -59,15 +81,12 @@ export const EntrepreneurDashboard: React.FC = () => {
         </div>
         
         <Link to="/investors">
-          <Button
-            leftIcon={<PlusCircle size={18} />}
-          >
+          <Button leftIcon={<PlusCircle size={18} />}>
             Find Investors
           </Button>
         </Link>
       </div>
       
-      {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-primary-50 border border-primary-100">
           <CardBody>
@@ -129,7 +148,6 @@ export const EntrepreneurDashboard: React.FC = () => {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Collaboration requests */}
         <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader className="flex justify-between items-center">
@@ -161,7 +179,6 @@ export const EntrepreneurDashboard: React.FC = () => {
           </Card>
         </div>
         
-        {/* Recommended investors - REAL DATA */}
         <div className="space-y-4">
           <Card>
             <CardHeader className="flex justify-between items-center">
@@ -174,30 +191,32 @@ export const EntrepreneurDashboard: React.FC = () => {
             <CardBody className="space-y-4">
               {loading ? (
                 <p className="text-gray-500 text-center py-4">Loading investors...</p>
+              ) : error ? (
+                <p className="text-error-500 text-center py-4">{error}</p>
               ) : recommendedInvestors.length > 0 ? (
-                recommendedInvestors.map((investor: any) => (
-                  <div key={investor.user.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                recommendedInvestors.map((investor: InvestorProfile) => (
+                  <div key={investor.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-center mb-2">
                       <img 
-                        src={investor.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(investor.user.name)}&background=random`} 
-                        alt={investor.user.name}
+                        src={investor.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(investor.name)}&background=random`} 
+                        alt={investor.name}
                         className="w-10 h-10 rounded-full mr-3"
                       />
                       <div>
-                        <h3 className="font-medium text-gray-900">{investor.user.name}</h3>
+                        <h3 className="font-medium text-gray-900">{investor.name}</h3>
                         <p className="text-sm text-gray-500">Investor</p>
                       </div>
                     </div>
-                    {investor.investmentInterests && (
+                    {Array.isArray(investor.investmentInterests) && investor.investmentInterests.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {JSON.parse(investor.investmentInterests || '[]').map((interest: string, idx: number) => (
+                        {investor.investmentInterests.slice(0, 3).map((interest: string, idx: number) => (
                           <span key={idx} className="px-2 py-1 bg-primary-50 text-primary-700 text-xs rounded-full">
                             {interest}
                           </span>
                         ))}
                       </div>
                     )}
-                    <p className="text-sm text-gray-600 mt-2 line-clamp-2">{investor.user.bio || 'No bio available'}</p>
+                    <p className="text-sm text-gray-600 mt-2 line-clamp-2">{investor.bio || 'No bio available'}</p>
                   </div>
                 ))
               ) : (
