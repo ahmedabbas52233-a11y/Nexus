@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Search, Filter, MapPin } from 'lucide-react';
 import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 import { InvestorCard } from '../../components/investor/InvestorCard';
 import { investors } from '../../data/users';
 
@@ -87,14 +86,17 @@ export const InvestorsPage: React.FC = () => {
                 <h3 className="text-sm font-medium text-gray-900 mb-2">Investment Interests</h3>
                 <div className="flex flex-wrap gap-2">
                   {allInterests.map(interest => (
-                    <Badge
+                    <button
                       key={interest}
-                      variant={selectedInterests.includes(interest) ? 'primary' : 'gray'}
-                      className="cursor-pointer"
                       onClick={() => toggleInterest(interest)}
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        selectedInterests.includes(interest)
+                          ? 'bg-primary-100 text-primary-700 border border-primary-300'
+                          : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                      }`}
                     >
                       {interest}
-                    </Badge>
+                    </button>
                   ))}
                 </div>
               </div>
