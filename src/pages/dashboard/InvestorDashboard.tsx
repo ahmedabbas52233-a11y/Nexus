@@ -1,47 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, PieChart, Filter, Search, PlusCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
-import { Badge } from '../../components/ui/Badge';
 import { EntrepreneurCard } from '../../components/entrepreneur/EntrepreneurCard';
 import { useAuth } from '../../context/AuthContext';
-import { Entrepreneur } from '../../types';
-import { entrepreneurs } from '../../data/users';
-import { getRequestsFromInvestor } from '../../data/collaborationRequests';
+import { profileAPI } from '../../Services/api';
+
+interface ApiEntrepreneur {
+  id?: number;
+  userId?: number;
+  name?: string;
+  startupName?: string;
+  industry?: string;
+  pitchSummary?: string;
+  avatarUrl?: string;
+  isOnline?: boolean;
+  location?: string;
+  fundingNeeded?: string;
+  [key: string]: unknown;
+}
 
 export const InvestorDashboard: React.FC = () => {
   const { user } = useAuth();
+  const [entrepreneurs, setEntrepreneurs] = useState<ApiEntrepreneur[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   
+  useEffect(() => {
+    const fetchEntrepreneurs = async () => {
+      try {
+        const data = await profileAPI.getAllProfiles('entrepreneur');
+        if (data.profiles && Array.isArray(data.profiles)) {
+          setEntrepreneurs(data.profiles);
+        } else if (Array.isArray(data)) {
+          setEntrepreneurs(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch entrepreneurs:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchEntrepreneurs();
+  }, []);
+  
   if (!user) return null;
   
-  // Get collaboration requests sent by this investor
-  const sentRequests = getRequestsFromInvestor(user.id);
-  const requestedEntrepreneurIds = sentRequests.map(req => req.entrepreneurId);
-  
-  // Filter entrepreneurs based on search and industry filters
-  const filteredEntrepreneurs = entrepreneurs.filter(entrepreneur => {
-    // Search filter
+  const filteredEntrepreneurs = entrepreneurs.filter((entrepreneur: ApiEntrepreneur) => {
     const matchesSearch = searchQuery === '' || 
-      entrepreneur.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      entrepreneur.startupName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      entrepreneur.industry.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      entrepreneur.pitchSummary.toLowerCase().includes(searchQuery.toLowerCase());
+      (entrepreneur.name && entrepreneur.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (entrepreneur.startupName && entrepreneur.startupName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (entrepreneur.industry && entrepreneur.industry.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (entrepreneur.pitchSummary && entrepreneur.pitchSummary.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    // Industry filter
     const matchesIndustry = selectedIndustries.length === 0 || 
-      selectedIndustries.includes(entrepreneur.industry);
+      (entrepreneur.industry && selectedIndustries.includes(entrepreneur.industry));
     
     return matchesSearch && matchesIndustry;
   });
   
-  // Get unique industries for filter
-  const industries = Array.from(new Set(entrepreneurs.map(e => e.industry)));
+  const industries = Array.from(new Set(entrepreneurs.map((e: ApiEntrepreneur) => e.industry).filter(Boolean))) as string[];
   
-  // Toggle industry selection
   const toggleIndustry = (industry: string) => {
     setSelectedIndustries(prevSelected => 
       prevSelected.includes(industry)
@@ -59,15 +82,12 @@ export const InvestorDashboard: React.FC = () => {
         </div>
         
         <Link to="/entrepreneurs">
-          <Button
-            leftIcon={<PlusCircle size={18} />}
-          >
+          <Button leftIcon={<PlusCircle size={18} />}>
             View All Startups
           </Button>
         </Link>
       </div>
       
-      {/* Filters and search */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="w-full md:w-2/3">
           <Input
@@ -86,21 +106,23 @@ export const InvestorDashboard: React.FC = () => {
             
             <div className="flex flex-wrap gap-2">
               {industries.map(industry => (
-                <Badge
+                <button
                   key={industry}
-                  variant={selectedIndustries.includes(industry) ? 'primary' : 'gray'}
-                  className="cursor-pointer"
                   onClick={() => toggleIndustry(industry)}
+                  className={`px-2 py-1 rounded-full text-xs ${
+                    selectedIndustries.includes(industry)
+                      ? 'bg-primary-100 text-primary-700 border border-primary-300'
+                      : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                  }`}
                 >
                   {industry}
-                </Badge>
+                </button>
               ))}
             </div>
           </div>
         </div>
       </div>
       
-      {/* Stats summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-primary-50 border border-primary-100">
           <CardBody>
@@ -138,16 +160,13 @@ export const InvestorDashboard: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm font-medium text-accent-700">Your Connections</p>
-                <h3 className="text-xl font-semibold text-accent-900">
-                  {sentRequests.filter(req => req.status === 'accepted').length}
-                </h3>
+                <h3 className="text-xl font-semibold text-accent-900">0</h3>
               </div>
             </div>
           </CardBody>
         </Card>
       </div>
       
-      {/* Entrepreneurs grid */}
       <div>
         <Card>
           <CardHeader>
@@ -155,11 +174,25 @@ export const InvestorDashboard: React.FC = () => {
           </CardHeader>
           
           <CardBody>
-            {filteredEntrepreneurs.length > 0 ? (
+            {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredEntrepreneurs.map(entrepreneur => (
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 animate-pulse">
+                    <div className="flex items-center mb-4">
+                      <div className="w-12 h-12 rounded-full bg-gray-200 mr-4" />
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                        <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredEntrepreneurs.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredEntrepreneurs.map((entrepreneur) => (
                   <EntrepreneurCard
-                    key={entrepreneur.id}
+                    key={entrepreneur.userId || entrepreneur.id || 0}
                     entrepreneur={entrepreneur}
                   />
                 ))}

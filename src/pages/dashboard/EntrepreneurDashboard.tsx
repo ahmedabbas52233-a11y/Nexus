@@ -7,7 +7,6 @@ import { Badge } from '../../components/ui/Badge';
 import { CollaborationRequestCard } from '../../components/collaboration/CollaborationRequestCard';
 import { useAuth } from '../../context/AuthContext';
 import { CollaborationRequest } from '../../types';
-import { getRequestsForEntrepreneur } from '../../data/collaborationRequests';
 import { profileAPI } from '../../Services/api';
 
 interface InvestorProfile {
@@ -36,12 +35,8 @@ export const EntrepreneurDashboard: React.FC = () => {
   
   useEffect(() => {
     if (user) {
-      try {
-        const requests = getRequestsForEntrepreneur(user.id);
-        setCollaborationRequests(requests);
-      } catch (err) {
-        console.error('Error loading collaboration requests:', err);
-      }
+      // TODO: Replace with real API when backend has collaboration routes
+      setCollaborationRequests([]);
       
       const fetchInvestors = async () => {
         try {
