@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Avatar } from '../../components/ui/Avatar';
-import { transactionAPI } from '../../Services/api';
+import { transactionAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 
 interface ApiTransaction {

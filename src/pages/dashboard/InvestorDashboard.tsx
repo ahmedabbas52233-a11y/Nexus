@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { EntrepreneurCard } from '../../components/entrepreneur/EntrepreneurCard';
 import { useAuth } from '../../context/AuthContext';
-import { profileAPI } from '../../Services/api';
+import { profileAPI } from '../../services/api';
 
 interface ApiEntrepreneur {
   id?: number;

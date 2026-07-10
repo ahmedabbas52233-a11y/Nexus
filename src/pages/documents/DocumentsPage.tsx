@@ -3,7 +3,7 @@ import { FileText, Upload, Download, Trash2, Share2 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
-import { documentAPI } from "../../Services/api";
+import { documentAPI } from "../../services/api";
 import toast from "react-hot-toast";
 
 interface ApiDocument {

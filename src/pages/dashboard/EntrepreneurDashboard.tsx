@@ -7,7 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { CollaborationRequestCard } from '../../components/collaboration/CollaborationRequestCard';
 import { useAuth } from '../../context/AuthContext';
 import { CollaborationRequest } from '../../types';
-import { profileAPI } from '../../Services/api';
+import { profileAPI } from '../../services/api';
 
 interface InvestorProfile {
   id: number;

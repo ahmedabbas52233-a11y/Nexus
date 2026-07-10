@@ -8,7 +8,7 @@ import { ChatMessage } from '../../components/chat/ChatMessage';
 import { ChatUserList } from '../../components/chat/ChatUserList';
 import { useAuth } from '../../context/AuthContext';
 import { ChatConversation } from '../../types';
-import { profileAPI } from '../../Services/api';
+import { profileAPI } from '../../services/api';
 
 interface ChatMessageData {
   id: string;

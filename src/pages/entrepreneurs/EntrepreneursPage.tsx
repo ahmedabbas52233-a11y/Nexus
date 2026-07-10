@@ -4,7 +4,7 @@ import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { EntrepreneurCard } from '../../components/entrepreneur/EntrepreneurCard';
 import { Button } from '../../components/ui/Button';
-import { profileAPI } from '../../Services/api';
+import { profileAPI } from '../../services/api';
 
 interface ApiEntrepreneur {
   id?: number;
