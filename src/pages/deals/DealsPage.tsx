@@ -58,7 +58,7 @@ export const DealsPage: React.FC = () => {
               logo: t.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(t.startupName || 'U')}&background=random`,
               industry: t.industry || 'Unknown',
             },
-            amount: t.amount || 'N/A',
+            amount: t.amount != null ? `$${Number(t.amount).toFixed(2)}` : 'N/A',
             equity: t.equity || 'N/A',
             status: t.status || 'Pending',
             stage: t.stage || 'Unknown',

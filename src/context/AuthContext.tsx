@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { User, UserRole, AuthContextType } from '../types';
-import { authAPI } from '../services/api';
+import { User, UserRole, AuthContextType, LoginResult } from '../types';
+import { authAPI, profileAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 /* eslint-disable react-refresh/only-export-components */
@@ -40,24 +40,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, []);
 
-  const login = async (email: string, password: string, role: UserRole): Promise<void> => {
+  const applySession = (data: { token: string; user: User }) => {
+    setUser(data.user);
+    localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+  };
+
+  const login = async (email: string, password: string, role: UserRole): Promise<LoginResult> => {
     setIsLoading(true);
     
     try {
       const data = await authAPI.login({ email, password });
-      
-      if (data.success) {
-        if (data.user.role !== role) {
-          throw new Error(`This account is registered as a ${data.user.role}, not ${role}`);
-        }
-        
-        setUser(data.user);
-        localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
-        toast.success('Successfully logged in!');
-      } else {
+
+      if (!data.success) {
         throw new Error(data.message || 'Login failed');
       }
+
+      // 2FA is enabled on this account - a verification code was emailed.
+      // Caller (LoginPage) is responsible for prompting for the OTP and
+      // calling verifyOtp() to complete the login.
+      if (data.requiresOtp) {
+        setIsLoading(false);
+        return { requiresOtp: true, userId: data.userId };
+      }
+
+      if (data.user.role !== role) {
+        throw new Error(`This account is registered as a ${data.user.role}, not ${role}`);
+      }
+
+      applySession(data);
+      toast.success('Successfully logged in!');
+      return { requiresOtp: false };
+    } catch (error) {
+      toast.error((error as Error).message);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyOtp = async (userId: number, otp: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const data = await authAPI.verifyLoginOtp(userId, otp);
+      if (!data.success) {
+        throw new Error(data.message || 'Verification failed');
+      }
+      applySession(data);
+      toast.success('Successfully logged in!');
     } catch (error) {
       toast.error((error as Error).message);
       throw error;
@@ -73,9 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await authAPI.register({ name, email, password, role });
       
       if (data.success) {
-        setUser(data.user);
-        localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+        applySession(data);
         toast.success('Account created successfully!');
       } else {
         throw new Error(data.message || 'Registration failed');
@@ -88,20 +116,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const forgotPassword = async (_email: string): Promise<void> => {
+  const forgotPassword = async (email: string): Promise<void> => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success('Password reset instructions sent to your email (mock)');
+      const data = await authAPI.forgotPassword(email);
+      toast.success(data.message || 'If that email exists, a reset link has been sent');
     } catch (error) {
       toast.error((error as Error).message);
       throw error;
     }
   };
 
-  const resetPassword = async (_token: string, _newPassword: string): Promise<void> => {
+  const resetPassword = async (token: string, newPassword: string): Promise<void> => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success('Password reset successfully (mock)');
+      const data = await authAPI.resetPassword(token, newPassword);
+      if (!data.success) {
+        throw new Error(data.message || 'Reset failed');
+      }
+      toast.success('Password reset successfully. Please log in.');
+    } catch (error) {
+      toast.error((error as Error).message);
+      throw error;
+    }
+  };
+
+  const toggleTwoFactor = async (enabled: boolean): Promise<void> => {
+    try {
+      const data = await authAPI.toggle2FA(enabled);
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update 2FA setting');
+      }
+      setUser((prev) => (prev ? { ...prev, twoFactorEnabled: enabled } : prev));
+      toast.success(enabled ? 'Two-factor authentication enabled' : 'Two-factor authentication disabled');
     } catch (error) {
       toast.error((error as Error).message);
       throw error;
@@ -110,8 +155,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (_userId: string, updates: Partial<User>): Promise<void> => {
     try {
-      setUser(prev => prev ? { ...prev, ...updates } : null);
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify({ ...user, ...updates }));
+      const data = await profileAPI.updateProfile(updates as Record<string, unknown>);
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update profile');
+      }
+      setUser((prev) => {
+        const next = prev ? { ...prev, ...updates } : prev;
+        if (next) localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(next));
+        return next;
+      });
       toast.success('Profile updated successfully');
     } catch (error) {
       toast.error((error as Error).message);
@@ -130,10 +182,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = {
     user,
     login,
+    verifyOtp,
     register,
     logout,
     forgotPassword,
     resetPassword,
+    toggleTwoFactor,
     updateProfile,
     isAuthenticated: !!user,
     isLoading

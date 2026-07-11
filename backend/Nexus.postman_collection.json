@@ -1,0 +1,247 @@
+{
+  "info": {
+    "name": "Nexus Platform API",
+    "description": "Investor & Entrepreneur Collaboration Platform - full backend API. Run 'Register' or 'Login' first; the collection auto-saves the returned JWT to the {{token}} variable and reuses it for every other request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api" },
+    { "key": "token", "value": "" },
+    { "key": "otherUserId", "value": "2" },
+    { "key": "documentId", "value": "1" },
+    { "key": "meetingId", "value": "1" },
+    { "key": "transactionId", "value": "1" },
+    { "key": "resetToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 201) { const data = pm.response.json(); pm.collectionVariables.set('token', data.token); }"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sarah Chen\",\n  \"email\": \"sarah@techwave.io\",\n  \"password\": \"password123\",\n  \"role\": \"entrepreneur\"\n}" }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [{ "listen": "test", "script": { "exec": ["const data = pm.response.json(); if (data.token) { pm.collectionVariables.set('token', data.token); }"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"sarah@techwave.io\",\n  \"password\": \"password123\"\n}" }
+          }
+        },
+        {
+          "name": "Verify Login OTP (2FA)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/2fa/verify-login",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": 1,\n  \"otp\": \"123456\"\n}" }
+          }
+        },
+        {
+          "name": "Toggle 2FA",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/auth/2fa/toggle",
+            "body": { "mode": "raw", "raw": "{\n  \"enabled\": true\n}" }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/auth/change-password",
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"password123\",\n  \"newPassword\": \"newpassword123\"\n}" }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/forgot-password",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"sarah@techwave.io\"\n}" }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/reset-password/{{resetToken}}",
+            "body": { "mode": "raw", "raw": "{\n  \"password\": \"newpassword123\"\n}" }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profiles",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/profiles/me" }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/profiles/me",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sarah Chen\",\n  \"bio\": \"Founder building the future of logistics\",\n  \"startupName\": \"TechWave\",\n  \"industry\": \"Logistics\",\n  \"fundingNeeded\": \"$500,000\"\n}" }
+          }
+        },
+        {
+          "name": "Get All Profiles (optionally filter by role)",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/profiles?role=investor" }
+        },
+        {
+          "name": "Get Profile By User Id",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/profiles/{{otherUserId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Meetings",
+      "item": [
+        {
+          "name": "Create Meeting",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/meetings",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Pitch call\",\n  \"description\": \"Series A discussion\",\n  \"recipientId\": {{otherUserId}},\n  \"startTime\": \"2026-08-01T10:00:00Z\",\n  \"endTime\": \"2026-08-01T10:30:00Z\"\n}" }
+          }
+        },
+        {
+          "name": "Get My Meetings",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/meetings" }
+        },
+        {
+          "name": "Update Meeting Status",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/meetings/{{meetingId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"accepted\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Upload Document",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/documents/upload",
+            "body": { "mode": "formdata", "formdata": [{ "key": "document", "type": "file", "src": [] }] }
+          }
+        },
+        {
+          "name": "Get My Documents",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/documents/my" }
+        },
+        {
+          "name": "Get All Documents",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/documents/all" }
+        },
+        {
+          "name": "Sign Document (e-signature)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/documents/{{documentId}}/sign",
+            "body": { "mode": "raw", "raw": "{\n  \"signature\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=\"\n}" }
+          }
+        },
+        {
+          "name": "Delete Document",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/documents/{{documentId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Payments / Transactions",
+      "item": [
+        {
+          "name": "Create Transaction (deposit/withdraw/transfer)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/transactions",
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"deposit\",\n  \"amount\": 500,\n  \"description\": \"Initial funding deposit\"\n}" }
+          }
+        },
+        {
+          "name": "Get My Transactions",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/transactions" }
+        },
+        {
+          "name": "Update Transaction Status",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/transactions/{{transactionId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"completed\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "Get Conversations",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/messages/conversations" }
+        },
+        {
+          "name": "Get Message Thread With User",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/messages/{{otherUserId}}" }
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/messages/{{otherUserId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"Hi, interested in a pitch call?\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        { "name": "Health", "request": { "method": "GET", "url": "{{baseUrl}}/health" } }
+      ]
+    }
+  ]
+}

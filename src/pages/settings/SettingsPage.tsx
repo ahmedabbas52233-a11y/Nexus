@@ -6,17 +6,25 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Avatar } from "../../components/ui/Avatar";
 import { useAuth } from "../../context/AuthContext";
+import { authAPI } from "../../services/api";
 import toast from "react-hot-toast";
 
 export const SettingsPage: React.FC = () => {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, toggleTwoFactor } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [togglingTwoFactor, setTogglingTwoFactor] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     bio: "",
     location: "",
   });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -40,16 +48,40 @@ export const SettingsPage: React.FC = () => {
         name: formData.name,
         bio: formData.bio,
       });
-      toast.success("Profile updated successfully");
-    } catch {
-      toast.error("Failed to update profile");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleChangePassword = () => {
-    toast.success("Password change feature coming soon");
+  const handleToggle2FA = async () => {
+    setTogglingTwoFactor(true);
+    try {
+      await toggleTwoFactor(!user.twoFactorEnabled);
+    } finally {
+      setTogglingTwoFactor(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+      toast.error("Fill in all password fields");
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const data = await authAPI.changePassword(passwordForm.currentPassword, passwordForm.newPassword);
+      if (!data.success) throw new Error(data.message || "Failed to change password");
+      toast.success("Password changed successfully");
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (err) {
+      toast.error((err as Error).message || "Failed to change password");
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   return (
@@ -212,13 +244,15 @@ export const SettingsPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">
-                      Add an extra layer of security to your account
+                      Add an extra layer of security to your account. When enabled, we'll email you a one-time code at login.
                     </p>
-                    <Badge variant="error" className="mt-1">
-                      Not Enabled
+                    <Badge variant={user.twoFactorEnabled ? "success" : "error"} className="mt-1">
+                      {user.twoFactorEnabled ? "Enabled" : "Not Enabled"}
                     </Badge>
                   </div>
-                  <Button variant="outline">Enable</Button>
+                  <Button variant="outline" onClick={handleToggle2FA} disabled={togglingTwoFactor}>
+                    {togglingTwoFactor ? "Saving..." : user.twoFactorEnabled ? "Disable" : "Enable"}
+                  </Button>
                 </div>
               </div>
 
@@ -227,11 +261,26 @@ export const SettingsPage: React.FC = () => {
                   Change Password
                 </h3>
                 <div className="space-y-4">
-                  <Input label="Current Password" type="password" />
-                  <Input label="New Password" type="password" />
-                  <Input label="Confirm New Password" type="password" />
+                  <Input
+                    label="Current Password"
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  />
+                  <Input
+                    label="New Password"
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  />
+                  <Input
+                    label="Confirm New Password"
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  />
                   <div className="flex justify-end">
-                    <Button onClick={handleChangePassword}>
+                    <Button onClick={handleChangePassword} isLoading={changingPassword}>
                       Update Password
                     </Button>
                   </div>

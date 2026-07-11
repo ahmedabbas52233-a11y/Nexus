@@ -3,12 +3,12 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { uploadDocument, getMyDocuments, getAllDocuments } = require('../controllers/documentController');
+const { uploadDocument, getMyDocuments, getAllDocuments, deleteDocument, signDocument } = require('../controllers/documentController');
 const { protect } = require('../middleware/auth');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, path.join(__dirname, '..', '..', 'uploads'));
   },
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
@@ -32,5 +32,7 @@ const upload = multer({
 router.post('/upload', protect, upload.single('document'), uploadDocument);
 router.get('/my', protect, getMyDocuments);
 router.get('/all', protect, getAllDocuments);
+router.delete('/:id', protect, deleteDocument);
+router.post('/:id/sign', protect, signDocument);
 
 module.exports = router;

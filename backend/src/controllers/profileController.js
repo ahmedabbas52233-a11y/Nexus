@@ -45,7 +45,41 @@ exports.getMyProfile = (req, res) => {
 exports.updateProfile = (req, res) => {
   const userId = parseInt(req.user.id, 10);
   const body = req.body;
-  
+
+  const finishWithProfile = () => {
+    db.get(`
+      SELECT p.*, u.name, u.email, u.role, u.avatarUrl, u.bio, u.isOnline, u.createdAt 
+      FROM profiles p 
+      JOIN users u ON p.userId = u.id 
+      WHERE p.userId = ?
+    `, [userId], (err, profile) => {
+      if (err) {
+        console.error('updateProfile refetch error:', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+      }
+      res.json({ success: true, profile: parseProfile(profile) });
+    });
+  };
+
+  const updateUserFields = (cb) => {
+    const userFields = [];
+    const userValues = [];
+    if (body.name !== undefined) { userFields.push('name = ?'); userValues.push(body.name); }
+    if (body.bio !== undefined) { userFields.push('bio = ?'); userValues.push(body.bio); }
+    if (body.avatarUrl !== undefined) { userFields.push('avatarUrl = ?'); userValues.push(body.avatarUrl); }
+
+    if (userFields.length === 0) return cb();
+
+    userValues.push(userId);
+    db.run(`UPDATE users SET ${userFields.join(', ')} WHERE id = ?`, userValues, (err) => {
+      if (err) {
+        console.error('updateProfile users update error:', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+      }
+      cb();
+    });
+  };
+
   // Get existing profile first
   db.get(`
     SELECT p.*, u.name, u.email, u.role, u.avatarUrl, u.bio, u.isOnline, u.createdAt 
@@ -90,8 +124,13 @@ exports.updateProfile = (req, res) => {
     addField('education', body.education);
     addField('preferences', body.preferences);
 
+    const hasUserFields = body.name !== undefined || body.bio !== undefined || body.avatarUrl !== undefined;
+
     if (fields.length === 0) {
-      return res.status(400).json({ success: false, message: 'No fields to update' });
+      if (!hasUserFields) {
+        return res.status(400).json({ success: false, message: 'No fields to update' });
+      }
+      return updateUserFields(finishWithProfile);
     }
 
     values.push(userId);
@@ -101,31 +140,7 @@ exports.updateProfile = (req, res) => {
         console.error('updateProfile run error:', err);
         return res.status(500).json({ success: false, message: 'Server error', error: err.message });
       }
-
-      console.log('updateProfile - rows changed:', this.changes);
-
-      // Merge existing profile with updates
-      const updatedProfile = { ...existingProfile };
-      
-      if (body.startupName !== undefined) updatedProfile.startupName = body.startupName;
-      if (body.pitchSummary !== undefined) updatedProfile.pitchSummary = body.pitchSummary;
-      if (body.fundingNeeded !== undefined) updatedProfile.fundingNeeded = body.fundingNeeded;
-      if (body.industry !== undefined) updatedProfile.industry = body.industry;
-      if (body.location !== undefined) updatedProfile.location = body.location;
-      if (body.foundedYear !== undefined) updatedProfile.foundedYear = body.foundedYear;
-      if (body.teamSize !== undefined) updatedProfile.teamSize = body.teamSize;
-      if (body.investmentInterests !== undefined) updatedProfile.investmentInterests = JSON.stringify(body.investmentInterests);
-      if (body.investmentStage !== undefined) updatedProfile.investmentStage = JSON.stringify(body.investmentStage);
-      if (body.portfolioCompanies !== undefined) updatedProfile.portfolioCompanies = JSON.stringify(body.portfolioCompanies);
-      if (body.totalInvestments !== undefined) updatedProfile.totalInvestments = body.totalInvestments;
-      if (body.minimumInvestment !== undefined) updatedProfile.minimumInvestment = body.minimumInvestment;
-      if (body.maximumInvestment !== undefined) updatedProfile.maximumInvestment = body.maximumInvestment;
-      if (body.website !== undefined) updatedProfile.website = body.website;
-      if (body.experience !== undefined) updatedProfile.experience = JSON.stringify(body.experience);
-      if (body.education !== undefined) updatedProfile.education = JSON.stringify(body.education);
-      if (body.preferences !== undefined) updatedProfile.preferences = JSON.stringify(body.preferences);
-
-      res.json({ success: true, profile: parseProfile(updatedProfile) });
+      updateUserFields(finishWithProfile);
     });
   });
 };

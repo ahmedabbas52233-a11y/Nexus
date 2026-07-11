@@ -1,4 +1,5 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 // Helper to get auth token
 const getToken = () => localStorage.getItem('business_nexus_token');
@@ -54,6 +55,36 @@ export const authAPI = {
     fetchWithAuth('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
+    }),
+
+  verifyLoginOtp: (userId: number, otp: string) =>
+    fetchWithAuth('/auth/2fa/verify-login', {
+      method: 'POST',
+      body: JSON.stringify({ userId, otp }),
+    }),
+
+  toggle2FA: (enabled: boolean) =>
+    fetchWithAuth('/auth/2fa/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
+
+  forgotPassword: (email: string) =>
+    fetchWithAuth('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    fetchWithAuth(`/auth/reset-password/${token}`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    fetchWithAuth('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
     }),
 
   getMe: () => fetchWithAuth('/auth/me'),
@@ -124,6 +155,12 @@ export const documentAPI = {
 
   getMyDocuments: () => fetchWithAuth('/documents/my'),
   getAllDocuments: () => fetchWithAuth('/documents/all'),
+  deleteDocument: (id: number) => fetchWithAuth(`/documents/${id}`, { method: 'DELETE' }),
+  signDocument: (id: number, signature: string) =>
+    fetchWithAuth(`/documents/${id}/sign`, {
+      method: 'POST',
+      body: JSON.stringify({ signature }),
+    }),
 };
 
 // Transaction types
@@ -145,7 +182,7 @@ export const transactionAPI = {
   getMyTransactions: () => fetchWithAuth('/transactions'),
 };
 
-// Messages API (placeholder - backend not implemented yet)
+// Messages API
 export const messageAPI = {
   getConversations: () => fetchWithAuth('/messages/conversations'),
   getMessages: (userId: string) => fetchWithAuth(`/messages/${userId}`),

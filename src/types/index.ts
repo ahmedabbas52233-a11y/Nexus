@@ -8,7 +8,13 @@ export interface User {
   avatarUrl: string;
   bio: string;
   isOnline?: boolean;
+  twoFactorEnabled?: boolean;
   createdAt: string;
+}
+
+export interface LoginResult {
+  requiresOtp: boolean;
+  userId?: number;
 }
 
 export interface Entrepreneur extends User {
@@ -70,11 +76,13 @@ export interface Document {
 
 export interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string, role: UserRole) => Promise<void>;
+  login: (email: string, password: string, role: UserRole) => Promise<LoginResult>;
+  verifyOtp: (userId: number, otp: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
+  toggleTwoFactor: (enabled: boolean) => Promise<void>;
   updateProfile: (userId: string, updates: Partial<User>) => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;

@@ -1,20 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Phone, Video, Info, Smile, ArrowLeft, MessageCircle } from 'lucide-react';
+import { Send, Phone, Video, Info, ArrowLeft, MessageCircle } from 'lucide-react';
 import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ChatMessage } from '../../components/chat/ChatMessage';
 import { ChatUserList } from '../../components/chat/ChatUserList';
+import { VideoCallModal } from '../../components/chat/VideoCallModal';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { ChatConversation } from '../../types';
-import { profileAPI } from '../../services/api';
+import { profileAPI, messageAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 
 interface ChatMessageData {
   id: string;
   senderId: string;
+  recipientId: string;
   content: string;
-  timestamp: string;
+  createdAt: string;
   isRead: boolean;
 }
 
@@ -26,63 +30,98 @@ interface UserProfile {
   role?: string;
 }
 
+interface IncomingCallState {
+  fromUserId: number;
+  offer: RTCSessionDescriptionInit;
+  callType: 'video' | 'audio';
+}
+
 export const ChatPage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const { user: currentUser } = useAuth();
+  const { socket, onlineUsers } = useSocket();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  
+
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [chatPartner, setChatPartner] = useState<UserProfile | null>(null);
   const [loadingPartner, setLoadingPartner] = useState(false);
-  
-  // Load conversations list
-  useEffect(() => {
+  const [sending, setSending] = useState(false);
+
+  const [outgoingInvite, setOutgoingInvite] = useState<'video' | 'audio' | null>(null);
+  const [incomingCall, setIncomingCall] = useState<IncomingCallState | null>(null);
+
+  // Build conversations list: real threads first, then any opposite-role
+  // profile without a thread yet so a new conversation can be started.
+  const loadConversations = useCallback(async () => {
     if (!currentUser) return;
-    
-    const loadConversations = async () => {
-      try {
-        const targetRole = currentUser.role === 'entrepreneur' ? 'investor' : 'entrepreneur';
-        const data = await profileAPI.getAllProfiles(targetRole);
-        
-        const convos: ChatConversation[] = data.profiles.map((profile: Record<string, unknown>) => {
-          const profileId = String(profile.userId || profile.id || 0);
-          return {
-            id: profileId,
-            participants: [String(currentUser.id), profileId],
-            lastMessage: {
-              content: 'Click to start a conversation',
-              timestamp: new Date().toISOString(),
-              isRead: true,
-              senderId: String(currentUser.id)
-            },
-            unreadCount: 0,
-            updatedAt: new Date().toISOString()
-          };
-        });
-        
-        setConversations(convos);
-      } catch (err) {
-        console.error('Failed to load conversations:', err);
-      }
-    };
-    
-    loadConversations();
+    try {
+      const [convoData, targetRole] = await Promise.all([
+        messageAPI.getConversations(),
+        Promise.resolve(currentUser.role === 'entrepreneur' ? 'investor' : 'entrepreneur')
+      ]);
+
+      const realConvos: ChatConversation[] = (convoData.conversations || []).map(
+        (c: { otherUserId: number; lastMessage: string; lastMessageAt: string; unreadCount: number }) => ({
+          id: String(c.otherUserId),
+          participants: [String(currentUser.id), String(c.otherUserId)],
+          lastMessage: {
+            id: '0',
+            senderId: '',
+            receiverId: String(currentUser.id),
+            content: c.lastMessage,
+            timestamp: c.lastMessageAt,
+            isRead: c.unreadCount === 0
+          },
+          unreadCount: c.unreadCount,
+          updatedAt: c.lastMessageAt
+        })
+      );
+
+      const existingIds = new Set(realConvos.map(c => c.id));
+      const profileData = await profileAPI.getAllProfiles(targetRole);
+      const extraConvos: ChatConversation[] = (profileData.profiles || [])
+        .map((profile: Record<string, unknown>) => String(profile.userId || profile.id || 0))
+        .filter((id: string) => !existingIds.has(id))
+        .map((profileId: string) => ({
+          id: profileId,
+          participants: [String(currentUser.id), profileId],
+          lastMessage: {
+            id: '0',
+            senderId: String(currentUser.id),
+            receiverId: profileId,
+            content: 'Click to start a conversation',
+            timestamp: new Date().toISOString(),
+            isRead: true
+          },
+          unreadCount: 0,
+          updatedAt: new Date(0).toISOString()
+        }));
+
+      setConversations([...realConvos, ...extraConvos]);
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
+    }
   }, [currentUser]);
-  
-  // Load chat partner when userId changes
+
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // Load chat partner profile when userId changes
   useEffect(() => {
     if (!userId) {
       setChatPartner(null);
       return;
     }
-    
+
     const fetchPartner = async () => {
       setLoadingPartner(true);
       try {
-        const profile = await profileAPI.getProfileById(userId);
+        const data = await profileAPI.getProfileById(userId);
+        const profile = data.profile || data;
         setChatPartner({
           id: Number(userId),
           name: String(profile.name || 'Unknown'),
@@ -102,63 +141,114 @@ export const ChatPage: React.FC = () => {
         setLoadingPartner(false);
       }
     };
-    
+
     fetchPartner();
   }, [userId]);
-  
+
+  // Load message history for the active thread
+  useEffect(() => {
+    if (!userId) {
+      setMessages([]);
+      return;
+    }
+    const loadMessages = async () => {
+      try {
+        const data = await messageAPI.getMessages(userId);
+        setMessages(data.messages || []);
+      } catch (err) {
+        console.error('Failed to load messages:', err);
+      }
+    };
+    loadMessages();
+  }, [userId]);
+
+  // Real-time inbound messages + calls
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessage = (message: ChatMessageData) => {
+      if (userId && String(message.senderId) === String(userId)) {
+        setMessages(prev => [...prev, message]);
+      }
+      loadConversations();
+    };
+
+    const handleCallInvite = (payload: IncomingCallState) => {
+      setIncomingCall(payload);
+    };
+
+    socket.on('new_message', handleNewMessage);
+    socket.on('call:invite', handleCallInvite);
+
+    return () => {
+      socket.off('new_message', handleNewMessage);
+      socket.off('call:invite', handleCallInvite);
+    };
+  }, [socket, userId, loadConversations]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-  
-  const handleSendMessage = (e: React.FormEvent) => {
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !currentUser || !userId) return;
-    
-    const message: ChatMessageData = {
-      id: Date.now().toString(),
-      senderId: String(currentUser.id),
-      content: newMessage.trim(),
-      timestamp: new Date().toISOString(),
-      isRead: false
-    };
-    
-    setMessages(prev => [...prev, message]);
+    if (!newMessage.trim() || !currentUser || !userId || sending) return;
+
+    const content = newMessage.trim();
     setNewMessage('');
-    
-    // Update conversation last message
-    setConversations(prev => prev.map(c => 
-      c.id === userId ? {
-        ...c,
-        lastMessage: {
-          id: message.id,
-          senderId: String(currentUser.id),
-          receiverId: userId,
-          content: message.content,
-          timestamp: message.timestamp,
-          isRead: false,
-          status: 'sent'
-        },
-        updatedAt: message.timestamp
-      } : c
-    ));
+    setSending(true);
+    try {
+      const data = await messageAPI.sendMessage(userId, content);
+      setMessages(prev => [...prev, data.message]);
+      loadConversations();
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
   };
-  
+
+  const startCall = (callType: 'video' | 'audio') => {
+    if (!chatPartner) return;
+    setOutgoingInvite(callType);
+  };
+
+  const closeCall = () => {
+    setOutgoingInvite(null);
+    setIncomingCall(null);
+  };
+
   if (!currentUser) return null;
-  
+
+  const activePartnerIsOnline = chatPartner ? !!onlineUsers[chatPartner.id] || chatPartner.isOnline : false;
+  const callTargetId = incomingCall ? incomingCall.fromUserId : chatPartner?.id;
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-white border border-gray-200 rounded-lg overflow-hidden animate-fade-in">
+      {(outgoingInvite || incomingCall) && callTargetId && (
+        <VideoCallModal
+          socket={socket}
+          partnerId={callTargetId}
+          partnerName={chatPartner?.name || 'User'}
+          partnerAvatar={chatPartner?.avatarUrl || `https://ui-avatars.com/api/?name=User`}
+          outgoingInvite={outgoingInvite}
+          incomingCall={incomingCall}
+          onClose={closeCall}
+        />
+      )}
+
       {/* Conversations sidebar */}
       <div className="hidden md:block w-1/3 lg:w-1/4 border-r border-gray-200">
         <ChatUserList conversations={conversations} />
       </div>
-      
+
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">
         {userId ? (
           <>
             <div className="border-b border-gray-200 p-4 flex justify-between items-center">
               <div className="flex items-center">
-                <button 
+                <button
                   onClick={() => navigate('/messages')}
                   className="md:hidden mr-3 p-1 hover:bg-gray-100 rounded"
                   title="Back to messages"
@@ -166,7 +256,7 @@ export const ChatPage: React.FC = () => {
                 >
                   <ArrowLeft size={20} className="text-gray-600" />
                 </button>
-                
+
                 {loadingPartner || !chatPartner ? (
                   <div className="flex items-center">
                     <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse mr-3" />
@@ -178,24 +268,24 @@ export const ChatPage: React.FC = () => {
                       src={chatPartner.avatarUrl}
                       alt={chatPartner.name}
                       size="md"
-                      status={chatPartner.isOnline ? 'online' : 'offline'}
+                      status={activePartnerIsOnline ? 'online' : 'offline'}
                       className="mr-3"
                     />
                     <div>
                       <h2 className="text-lg font-medium text-gray-900">{chatPartner.name}</h2>
                       <p className="text-sm text-gray-500">
-                        {chatPartner.isOnline ? 'Online' : 'Offline'}
+                        {activePartnerIsOnline ? 'Online' : 'Offline'}
                       </p>
                     </div>
                   </>
                 )}
               </div>
-              
+
               <div className="flex space-x-2">
-                <Button variant="ghost" size="sm" className="rounded-full p-2" title="Voice call">
+                <Button variant="ghost" size="sm" className="rounded-full p-2" title="Voice call" onClick={() => startCall('audio')}>
                   <Phone size={18} />
                 </Button>
-                <Button variant="ghost" size="sm" className="rounded-full p-2" title="Video call">
+                <Button variant="ghost" size="sm" className="rounded-full p-2" title="Video call" onClick={() => startCall('video')}>
                   <Video size={18} />
                 </Button>
                 <Button variant="ghost" size="sm" className="rounded-full p-2" title="Info">
@@ -203,15 +293,15 @@ export const ChatPage: React.FC = () => {
                 </Button>
               </div>
             </div>
-            
+
             <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
               {messages.length > 0 ? (
                 <div className="space-y-4">
                   {messages.map(message => (
                     <ChatMessage
                       key={message.id}
-                      message={message}
-                      isCurrentUser={message.senderId === String(currentUser.id)}
+                      message={{ content: message.content, timestamp: message.createdAt }}
+                      isCurrentUser={String(message.senderId) === String(currentUser.id)}
                     />
                   ))}
                   <div ref={messagesEndRef} />
@@ -226,12 +316,9 @@ export const ChatPage: React.FC = () => {
                 </div>
               )}
             </div>
-            
+
             <div className="border-t border-gray-200 p-4">
               <form onSubmit={handleSendMessage} className="flex space-x-2">
-                <Button type="button" variant="ghost" size="sm" className="rounded-full p-2" title="Add emoji">
-                  <Smile size={20} />
-                </Button>
                 <Input
                   type="text"
                   placeholder="Type a message..."
@@ -243,7 +330,7 @@ export const ChatPage: React.FC = () => {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={!newMessage.trim()}
+                  disabled={!newMessage.trim() || sending}
                   className="rounded-full p-2 w-10 h-10 flex items-center justify-center"
                   title="Send message"
                 >

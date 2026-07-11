@@ -23,9 +23,33 @@ db.run(`
     isVerified INTEGER DEFAULT 0,
     twoFactorEnabled INTEGER DEFAULT 0,
     twoFactorSecret TEXT DEFAULT NULL,
+    resetPasswordToken TEXT DEFAULT NULL,
+    resetPasswordExpire DATETIME DEFAULT NULL,
+    otpCode TEXT DEFAULT NULL,
+    otpExpires DATETIME DEFAULT NULL,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
+
+// Lightweight migration for DBs created before these columns existed
+db.all("PRAGMA table_info(users)", [], (err, columns) => {
+  if (err) return;
+  const names = columns.map(c => c.name);
+  const toAdd = [
+    ['resetPasswordToken', "TEXT DEFAULT NULL"],
+    ['resetPasswordExpire', "DATETIME DEFAULT NULL"],
+    ['otpCode', "TEXT DEFAULT NULL"],
+    ['otpExpires', "DATETIME DEFAULT NULL"],
+    ['twoFactorEnabled', "INTEGER DEFAULT 0"],
+    ['twoFactorSecret', "TEXT DEFAULT NULL"],
+    ['isVerified', "INTEGER DEFAULT 0"]
+  ];
+  toAdd.forEach(([col, def]) => {
+    if (!names.includes(col)) {
+      db.run(`ALTER TABLE users ADD COLUMN ${col} ${def}`);
+    }
+  });
+});
 
 db.run(`
   CREATE TABLE IF NOT EXISTS profiles (
@@ -74,9 +98,18 @@ db.run(`
     size INTEGER NOT NULL,
     path TEXT NOT NULL,
     ownerId INTEGER NOT NULL REFERENCES users(id),
+    signature TEXT DEFAULT NULL,
+    signedAt DATETIME DEFAULT NULL,
     uploadedAt DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
+
+db.all("PRAGMA table_info(documents)", [], (err, columns) => {
+  if (err) return;
+  const names = columns.map(c => c.name);
+  if (!names.includes('signature')) db.run("ALTER TABLE documents ADD COLUMN signature TEXT DEFAULT NULL");
+  if (!names.includes('signedAt')) db.run("ALTER TABLE documents ADD COLUMN signedAt DATETIME DEFAULT NULL");
+});
 
 db.run(`
   CREATE TABLE IF NOT EXISTS transactions (
@@ -86,6 +119,17 @@ db.run(`
     amount REAL NOT NULL,
     status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'completed', 'failed')),
     description TEXT DEFAULT '',
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    senderId INTEGER NOT NULL REFERENCES users(id),
+    recipientId INTEGER NOT NULL REFERENCES users(id),
+    content TEXT NOT NULL,
+    isRead INTEGER DEFAULT 0,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);

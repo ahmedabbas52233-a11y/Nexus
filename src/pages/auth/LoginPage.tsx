@@ -13,8 +13,10 @@ export const LoginPage: React.FC = () => {
   const [role, setRole] = useState<UserRole>('entrepreneur');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [otpStep, setOtpStep] = useState<{ userId: number; role: UserRole } | null>(null);
+  const [otp, setOtp] = useState('');
   
-  const { login } = useAuth();
+  const { login, verifyOtp } = useAuth();
   const navigate = useNavigate();
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,8 +25,27 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     
     try {
-      await login(email, password, role);
+      const result = await login(email, password, role);
+      if (result.requiresOtp && result.userId) {
+        setOtpStep({ userId: result.userId, role });
+        setIsLoading(false);
+        return;
+      }
       navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
+    } catch (err) {
+      setError((err as Error).message);
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpStep) return;
+    setError(null);
+    setIsLoading(true);
+    try {
+      await verifyOtp(otpStep.userId, otp);
+      navigate(otpStep.role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
     } catch (err) {
       setError((err as Error).message);
       setIsLoading(false);
@@ -100,6 +121,34 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
           
+          {otpStep ? (
+            <form className="space-y-6" onSubmit={handleVerifyOtp}>
+              <p className="text-sm text-gray-600">
+                This account has two-factor authentication enabled. Enter the 6-digit code we emailed you to finish signing in.
+              </p>
+              <Input
+                label="Verification code"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                required
+                fullWidth
+              />
+              <Button type="submit" fullWidth isLoading={isLoading} leftIcon={<LogIn size={18} />}>
+                Verify & sign in
+              </Button>
+              <button
+                type="button"
+                className="w-full text-sm text-gray-500 hover:text-gray-700"
+                onClick={() => { setOtpStep(null); setOtp(''); }}
+              >
+                Back to login
+              </button>
+            </form>
+          ) : (
+          <>
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -167,9 +216,9 @@ export const LoginPage: React.FC = () => {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
+                <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
                   Forgot your password?
-                </a>
+                </Link>
               </div>
             </div>
             
@@ -231,6 +280,8 @@ export const LoginPage: React.FC = () => {
               </p>
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
