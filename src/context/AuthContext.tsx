@@ -3,6 +3,8 @@ import { User, UserRole, AuthContextType } from '../types';
 import { authAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
+/* eslint-disable react-refresh/only-export-components */
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const USER_STORAGE_KEY = 'business_nexus_user';

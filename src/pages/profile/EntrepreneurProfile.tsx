@@ -13,8 +13,10 @@ export const EntrepreneurProfile: React.FC = () => {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   
-  const [profile, setProfile] = useState<any>(null);
-  const [user, setUser] = useState<any>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const [profile, setProfile] = useState<any>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [hasRequestedCollaboration, setHasRequestedCollaboration] = useState(false);
