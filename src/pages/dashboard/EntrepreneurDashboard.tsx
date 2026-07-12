@@ -7,7 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { CollaborationRequestCard } from '../../components/collaboration/CollaborationRequestCard';
 import { useAuth } from '../../context/AuthContext';
 import { CollaborationRequest } from '../../types';
-import { profileAPI } from '../../services/api';
+import { profileAPI, meetingAPI, documentAPI, messageAPI } from '../../services/api';
 
 interface InvestorProfile {
   id: number;
@@ -32,6 +32,9 @@ export const EntrepreneurDashboard: React.FC = () => {
   const [recommendedInvestors, setRecommendedInvestors] = useState<InvestorProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [upcomingMeetingsCount, setUpcomingMeetingsCount] = useState(0);
+  const [documentsCount, setDocumentsCount] = useState(0);
+  const [connectionsCount, setConnectionsCount] = useState(0);
   
   useEffect(() => {
     if (user) {
@@ -50,6 +53,24 @@ export const EntrepreneurDashboard: React.FC = () => {
         }
       };
       fetchInvestors();
+
+      meetingAPI.getMyMeetings()
+        .then((data) => {
+          const now = new Date();
+          const count = (data.meetings || []).filter(
+            (m: { status: string; endTime: string }) => m.status !== 'rejected' && new Date(m.endTime) >= now
+          ).length;
+          setUpcomingMeetingsCount(count);
+        })
+        .catch((err) => console.error('Failed to fetch meetings:', err));
+
+      documentAPI.getMyDocuments()
+        .then((data) => setDocumentsCount((data.documents || []).length))
+        .catch((err) => console.error('Failed to fetch documents:', err));
+
+      messageAPI.getConversations()
+        .then((data) => setConnectionsCount((data.conversations || []).length))
+        .catch((err) => console.error('Failed to fetch conversations:', err));
     }
   }, [user]);
   
@@ -106,7 +127,7 @@ export const EntrepreneurDashboard: React.FC = () => {
               <div>
                 <p className="text-sm font-medium text-secondary-700">Total Connections</p>
                 <h3 className="text-xl font-semibold text-secondary-900">
-                  {collaborationRequests.filter(req => req.status === 'accepted').length}
+                  {connectionsCount}
                 </h3>
               </div>
             </div>
@@ -121,7 +142,7 @@ export const EntrepreneurDashboard: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm font-medium text-accent-700">Upcoming Meetings</p>
-                <h3 className="text-xl font-semibold text-accent-900">2</h3>
+                <h3 className="text-xl font-semibold text-accent-900">{upcomingMeetingsCount}</h3>
               </div>
             </div>
           </CardBody>
@@ -134,8 +155,8 @@ export const EntrepreneurDashboard: React.FC = () => {
                 <TrendingUp size={20} className="text-success-700" />
               </div>
               <div>
-                <p className="text-sm font-medium text-success-700">Profile Views</p>
-                <h3 className="text-xl font-semibold text-success-900">24</h3>
+                <p className="text-sm font-medium text-success-700">My Documents</p>
+                <h3 className="text-xl font-semibold text-success-900">{documentsCount}</h3>
               </div>
             </div>
           </CardBody>

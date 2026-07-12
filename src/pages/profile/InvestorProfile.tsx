@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Building2, MapPin, BarChart3, Briefcase, ArrowLeft, Edit, Save, X } from 'lucide-react';
+import { MessageCircle, Building2, MapPin, BarChart3, Briefcase, ArrowLeft, Edit, Save, X, CalendarClock } from 'lucide-react';
 import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { useAuth } from '../../context/AuthContext';
 import { profileAPI } from '../../services/api';
+import { ScheduleMeetingModal } from '../../components/meetings/ScheduleMeetingModal';
+import toast from 'react-hot-toast';
 
 interface ProfileData {
   id?: number;
@@ -60,6 +62,7 @@ export const InvestorProfile: React.FC = () => {
   });
 
   const isCurrentUser = !id || String(currentUser?.id) === String(id);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -103,7 +106,6 @@ export const InvestorProfile: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('handleSubmit called');
     setSaving(true);
     
     try {
@@ -118,15 +120,15 @@ export const InvestorProfile: React.FC = () => {
         bio: formData.bio,
       };
       
-      console.log('Sending update:', updateData);
       const data = await profileAPI.updateProfile(updateData);
-      console.log('Update response:', data);
-      
+      if (!data.success) throw new Error(data.message || 'Failed to save profile');
+
       setProfile(data.profile);
       setIsEditing(false);
+      toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Failed to update profile:', error);
-      alert('Failed to save profile. Check console for details.');
+      toast.error((error as Error).message || 'Failed to save profile');
     } finally {
       setSaving(false);
     }
@@ -278,6 +280,14 @@ export const InvestorProfile: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {showScheduleModal && (
+        <ScheduleMeetingModal
+          recipientId={Number(user.id)}
+          recipientName={user.name}
+          onClose={() => setShowScheduleModal(false)}
+          onScheduled={() => setShowScheduleModal(false)}
+        />
+      )}
       <Card>
         <CardBody className="sm:flex sm:items-start sm:justify-between p-6">
           <div className="sm:flex sm:space-x-6">
@@ -317,6 +327,11 @@ export const InvestorProfile: React.FC = () => {
                   Message
                 </Button>
               </Link>
+            )}
+            {!isCurrentUser && (
+              <Button variant="outline" leftIcon={<CalendarClock size={18} />} onClick={() => setShowScheduleModal(true)}>
+                Schedule Meeting
+              </Button>
             )}
             {isCurrentUser && (
               <Button variant="outline" leftIcon={<Edit size={18} />} onClick={() => setIsEditing(true)}>

@@ -1,7 +1,9 @@
 import { FC } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 
 // Layouts
 import { DashboardLayout } from './components/layout/DashboardLayout';
@@ -30,6 +32,7 @@ import { SettingsPage } from './pages/settings/SettingsPage';
 import { HelpPage } from './pages/help/HelpPage';
 import { DealsPage } from './pages/deals/DealsPage';
 import { PaymentsPage } from './pages/payments/PaymentsPage';
+import { MeetingsPage } from './pages/meetings/MeetingsPage';
 
 // Chat Pages
 import { ChatPage } from './pages/chat/ChatPage';
@@ -38,6 +41,8 @@ const App: FC = () => {
   return (
     <AuthProvider>
       <SocketProvider>
+      <NotificationsProvider>
+      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <Router>
         <Routes>
           {/* Authentication Routes */}
@@ -94,6 +99,10 @@ const App: FC = () => {
           <Route path="/payments" element={<DashboardLayout />}>
             <Route index element={<PaymentsPage />} />
           </Route>
+
+          <Route path="/meetings" element={<DashboardLayout />}>
+            <Route index element={<MeetingsPage />} />
+          </Route>
           
           {/* Chat Routes */}
           <Route path="/chat" element={<DashboardLayout />}>
@@ -108,6 +117,7 @@ const App: FC = () => {
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
+      </NotificationsProvider>
       </SocketProvider>
     </AuthProvider>
   );

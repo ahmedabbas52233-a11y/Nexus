@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { EntrepreneurCard } from '../../components/entrepreneur/EntrepreneurCard';
 import { useAuth } from '../../context/AuthContext';
-import { profileAPI } from '../../services/api';
+import { profileAPI, messageAPI } from '../../services/api';
 
 interface ApiEntrepreneur {
   id?: number;
@@ -28,6 +28,7 @@ export const InvestorDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [connectionsCount, setConnectionsCount] = useState(0);
   
   useEffect(() => {
     const fetchEntrepreneurs = async () => {
@@ -46,6 +47,10 @@ export const InvestorDashboard: React.FC = () => {
     };
     
     fetchEntrepreneurs();
+
+    messageAPI.getConversations()
+      .then((data) => setConnectionsCount((data.conversations || []).length))
+      .catch((err) => console.error('Failed to fetch conversations:', err));
   }, []);
   
   if (!user) return null;
@@ -160,7 +165,7 @@ export const InvestorDashboard: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm font-medium text-accent-700">Your Connections</p>
-                <h3 className="text-xl font-semibold text-accent-900">0</h3>
+                <h3 className="text-xl font-semibold text-accent-900">{connectionsCount}</h3>
               </div>
             </div>
           </CardBody>

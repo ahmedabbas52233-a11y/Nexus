@@ -5,6 +5,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { uploadDocument, getMyDocuments, getAllDocuments, deleteDocument, signDocument } = require('../controllers/documentController');
 const { protect } = require('../middleware/auth');
+const { signatureValidation } = require('../middleware/validation');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -33,6 +34,6 @@ router.post('/upload', protect, upload.single('document'), uploadDocument);
 router.get('/my', protect, getMyDocuments);
 router.get('/all', protect, getAllDocuments);
 router.delete('/:id', protect, deleteDocument);
-router.post('/:id/sign', protect, signDocument);
+router.post('/:id/sign', protect, signatureValidation, signDocument);
 
 module.exports = router;

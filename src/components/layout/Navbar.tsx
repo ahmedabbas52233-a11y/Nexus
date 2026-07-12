@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Menu, X, Bell, MessageCircle, User, LogOut, Building2, CircleDollarSign } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationsContext';
 import { Avatar } from '../ui/Avatar';
 import { Button } from '../ui/Button';
 
 export const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   
   const toggleMenu = () => {
@@ -41,7 +43,14 @@ export const Navbar: React.FC = () => {
       path: user ? '/messages' : '/login',
     },
     {
-      icon: <Bell size={18} />,
+      icon: (
+        <span className="relative inline-flex">
+          <Bell size={18} />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-error-500 rounded-full" />
+          )}
+        </span>
+      ),
       text: 'Notifications',
       path: user ? '/notifications' : '/login',
     },

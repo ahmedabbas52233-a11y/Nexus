@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
 import { FileText, Upload, Download, Trash2, Eye, PenLine } from "lucide-react";
 import { Card, CardHeader, CardBody } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -44,7 +45,6 @@ export const DocumentsPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<DocItem | null>(null);
   const [signingDoc, setSigningDoc] = useState<DocItem | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -81,14 +81,7 @@ export const DocumentsPage: React.FC = () => {
     fetchDocuments();
   }, [fetchDocuments]);
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const uploadFile = useCallback(async (file: File) => {
     setUploading(true);
     try {
       const data = await documentAPI.uploadDocument(file);
@@ -100,9 +93,32 @@ export const DocumentsPage: React.FC = () => {
       toast.error((err as Error).message || "Failed to upload document");
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  };
+  }, [fetchDocuments]);
+
+  const onDrop = useCallback((acceptedFiles: File[], fileRejections: { errors: { message: string }[] }[]) => {
+    if (fileRejections.length > 0) {
+      toast.error(fileRejections[0].errors[0]?.message || "File not accepted");
+      return;
+    }
+    const file = acceptedFiles[0];
+    if (file) uploadFile(file);
+  }, [uploadFile]);
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDrop,
+    multiple: false,
+    maxSize: 10 * 1024 * 1024, // 10MB, matches backend limit
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+    },
+    noClick: true,
+    noKeyboard: true,
+  });
 
   const handleDownload = (doc: DocItem) => {
     window.open(doc.url, "_blank", "noopener,noreferrer");
@@ -165,11 +181,24 @@ export const DocumentsPage: React.FC = () => {
         </div>
 
         <div>
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-          <Button leftIcon={<Upload size={18} />} onClick={handleUploadClick} disabled={uploading}>
+          <input {...getInputProps()} />
+          <Button leftIcon={<Upload size={18} />} onClick={open} disabled={uploading}>
             {uploading ? "Uploading..." : "Upload Document"}
           </Button>
         </div>
+      </div>
+
+      <div
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+          isDragActive ? "border-primary-500 bg-primary-50" : "border-gray-300 bg-gray-50"
+        }`}
+      >
+        <Upload size={24} className="mx-auto text-gray-400 mb-2" />
+        <p className="text-sm text-gray-600">
+          {isDragActive ? "Drop the file here…" : "Drag and drop a file here, or click \"Upload Document\" above"}
+        </p>
+        <p className="text-xs text-gray-400 mt-1">PDF, DOC, DOCX, PNG, JPG — up to 10MB</p>
       </div>
 
       <Card>

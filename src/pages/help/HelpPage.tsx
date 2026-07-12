@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Search, Book, MessageCircle, Phone, Mail, ExternalLink } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import toast from 'react-hot-toast';
 
 const faqs = [
   {
@@ -24,6 +25,19 @@ const faqs = [
 ];
 
 export const HelpPage: React.FC = () => {
+  const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
+
+  const handleContactSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactForm.name || !contactForm.email || !contactForm.message) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+    const subject = encodeURIComponent(`Nexus support request from ${contactForm.name}`);
+    const body = encodeURIComponent(`${contactForm.message}\n\n— ${contactForm.name} (${contactForm.email})`);
+    window.location.href = `mailto:support@businessnexus.com?subject=${subject}&body=${body}`;
+    toast.success('Opening your email client...');
+  };
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -123,17 +137,21 @@ export const HelpPage: React.FC = () => {
           <h2 className="text-lg font-medium text-gray-900">Still need help?</h2>
         </CardHeader>
         <CardBody>
-          <form className="space-y-6 max-w-2xl">
+          <form className="space-y-6 max-w-2xl" onSubmit={handleContactSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Input
                 label="Name"
                 placeholder="Your name"
+                value={contactForm.name}
+                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
               />
               
               <Input
                 label="Email"
                 type="email"
                 placeholder="your@email.com"
+                value={contactForm.email}
+                onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
               />
             </div>
             
@@ -145,11 +163,13 @@ export const HelpPage: React.FC = () => {
                 className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 rows={4}
                 placeholder="How can we help you?"
+                value={contactForm.message}
+                onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
               ></textarea>
             </div>
             
             <div>
-              <Button>
+              <Button type="submit">
                 Send Message
               </Button>
             </div>

@@ -41,6 +41,13 @@ const io = new Server(server, {
 app.set('io', io);
 require('./socket')(io);
 
+// Render/Heroku/etc sit behind a reverse proxy - trust the first hop so
+// express-rate-limit (and req.ip generally) see the real client IP
+// instead of the proxy's IP for every request.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security middleware
 app.use(helmet());
 app.use(cors({
@@ -58,6 +65,17 @@ const authLimiter = rateLimit({
   legacyHeaders: false
 });
 app.use('/api/auth', authLimiter);
+
+// General API rate limit - more generous, guards against scripted abuse
+// (e.g. message/meeting spam) on every other endpoint
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: { success: false, message: 'Too many requests, please slow down' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/', apiLimiter);
 
 // Body parser
 app.use(express.json());
@@ -85,6 +103,15 @@ app.get('/api/health', (req, res) => {
 
 // Error handling
 app.use((err, req, res, next) => {
+  // Multer file-validation errors (bad type / too large) are client input
+  // errors, not server faults - respond 400, not 500.
+  if (err.name === 'MulterError' || /Invalid file type/.test(err.message || '')) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+  // Malformed JSON bodies from express.json() are also a client error.
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ success: false, message: 'Malformed JSON in request body' });
+  }
   console.error(err.stack);
   res.status(500).json({ success: false, message: err.message || 'Something went wrong!' });
 });

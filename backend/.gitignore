@@ -1,0 +1,7 @@
+node_modules
+.env
+nexus.db
+uploads/
+*.log
+npm-debug.log*
+.DS_Store

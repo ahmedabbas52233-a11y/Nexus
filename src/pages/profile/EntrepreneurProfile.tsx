@@ -1,25 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Users, Calendar, Building2, MapPin, DollarSign, Send, ArrowLeft, Edit, Save, X } from 'lucide-react';
+import { MessageCircle, Users, Calendar, Building2, MapPin, DollarSign, Send, ArrowLeft, Edit, Save, X, CalendarClock } from 'lucide-react';
 import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { useAuth } from '../../context/AuthContext';
 import { profileAPI } from '../../services/api';
+import { ScheduleMeetingModal } from '../../components/meetings/ScheduleMeetingModal';
+import toast from 'react-hot-toast';
+
+interface EntrepreneurProfileData {
+  id: number;
+  userId?: number;
+  name: string;
+  email?: string;
+  avatarUrl?: string;
+  bio?: string;
+  isOnline?: boolean;
+  startupName?: string;
+  pitchSummary?: string;
+  industry?: string;
+  location?: string;
+  fundingNeeded?: string;
+  foundedYear?: number;
+  teamSize?: number;
+  website?: string;
+}
 
 export const EntrepreneurProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const [profile, setProfile] = useState<any>(null);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<EntrepreneurProfileData | null>(null);
+  const [user, setUser] = useState<EntrepreneurProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [hasRequestedCollaboration, setHasRequestedCollaboration] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [saving, setSaving] = useState(false);
   
   const [formData, setFormData] = useState({
     startupName: '',
@@ -74,12 +94,18 @@ const [user, setUser] = useState<any>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
       const data = await profileAPI.updateProfile(formData);
+      if (!data.success) throw new Error(data.message || 'Failed to save profile');
       setProfile(data.profile);
       setIsEditing(false);
+      toast.success('Profile saved successfully');
     } catch (error) {
       console.error('Failed to update profile:', error);
+      toast.error((error as Error).message || 'Failed to save profile');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -213,7 +239,7 @@ const [user, setUser] = useState<any>(null);
               </div>
 
               <div className="flex space-x-3 pt-4">
-                <Button type="submit" leftIcon={<Save size={18} />}>
+                <Button type="submit" leftIcon={<Save size={18} />} isLoading={saving} disabled={saving}>
                   Save Profile
                 </Button>
                 {!isEmpty && (
@@ -232,6 +258,14 @@ const [user, setUser] = useState<any>(null);
   // Profile view
   return (
     <div className="space-y-6 animate-fade-in">
+      {showScheduleModal && (
+        <ScheduleMeetingModal
+          recipientId={Number(user.id)}
+          recipientName={user.name}
+          onClose={() => setShowScheduleModal(false)}
+          onScheduled={() => setShowScheduleModal(false)}
+        />
+      )}
       <Card>
         <CardBody className="sm:flex sm:items-start sm:justify-between p-6">
           <div className="sm:flex sm:space-x-6">
@@ -283,6 +317,9 @@ const [user, setUser] = useState<any>(null);
                     Message
                   </Button>
                 </Link>
+                <Button variant="outline" leftIcon={<CalendarClock size={18} />} onClick={() => setShowScheduleModal(true)}>
+                  Schedule Meeting
+                </Button>
                 {isInvestor && (
                   <Button leftIcon={<Send size={18} />} disabled={hasRequestedCollaboration} onClick={handleSendRequest}>
                     {hasRequestedCollaboration ? 'Request Sent' : 'Request Collaboration'}

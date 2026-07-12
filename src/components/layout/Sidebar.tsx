@@ -1,37 +1,47 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationsContext';
 import { 
   Home, Building2, CircleDollarSign, Users, MessageCircle, 
-  Bell, FileText, Settings, HelpCircle, Wallet
+  Bell, FileText, Settings, HelpCircle, Wallet, CalendarClock
 } from 'lucide-react';
 
 interface SidebarItemProps {
   to: string;
   icon: React.ReactNode;
   text: string;
+  badge?: number;
 }
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ to, icon, text }) => {
+const SidebarItem: React.FC<SidebarItemProps> = ({ to, icon, text, badge }) => {
   return (
     <NavLink
       to={to}
       className={({ isActive }) => 
-        `flex items-center py-2.5 px-4 rounded-md transition-colors duration-200 ${
+        `flex items-center justify-between py-2.5 px-4 rounded-md transition-colors duration-200 ${
           isActive 
             ? 'bg-primary-50 text-primary-700' 
             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
         }`
       }
     >
-      <span className="mr-3">{icon}</span>
-      <span className="text-sm font-medium">{text}</span>
+      <span className="flex items-center">
+        <span className="mr-3">{icon}</span>
+        <span className="text-sm font-medium">{text}</span>
+      </span>
+      {!!badge && (
+        <span className="bg-error-500 text-white text-xs font-medium rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
     </NavLink>
   );
 };
 
 export const Sidebar: React.FC = () => {
   const { user } = useAuth();
+  const { unreadCount } = useNotifications();
   
   if (!user) return null;
   
@@ -41,6 +51,7 @@ export const Sidebar: React.FC = () => {
     { to: '/profile/entrepreneur/' + user.id, icon: <Building2 size={20} />, text: 'My Startup' },
     { to: '/investors', icon: <CircleDollarSign size={20} />, text: 'Find Investors' },
     { to: '/messages', icon: <MessageCircle size={20} />, text: 'Messages' },
+    { to: '/meetings', icon: <CalendarClock size={20} />, text: 'Meetings' },
     { to: '/notifications', icon: <Bell size={20} />, text: 'Notifications' },
     { to: '/documents', icon: <FileText size={20} />, text: 'Documents' },
     { to: '/payments', icon: <Wallet size={20} />, text: 'Payments' },
@@ -51,6 +62,7 @@ export const Sidebar: React.FC = () => {
     { to: '/profile/investor/' + user.id, icon: <CircleDollarSign size={20} />, text: 'My Portfolio' },
     { to: '/entrepreneurs', icon: <Users size={20} />, text: 'Find Startups' },
     { to: '/messages', icon: <MessageCircle size={20} />, text: 'Messages' },
+    { to: '/meetings', icon: <CalendarClock size={20} />, text: 'Meetings' },
     { to: '/notifications', icon: <Bell size={20} />, text: 'Notifications' },
     { to: '/deals', icon: <FileText size={20} />, text: 'Deals' },
     { to: '/payments', icon: <Wallet size={20} />, text: 'Payments' },
@@ -63,7 +75,6 @@ export const Sidebar: React.FC = () => {
     { to: '/settings', icon: <Settings size={20} />, text: 'Settings' },
     { to: '/help', icon: <HelpCircle size={20} />, text: 'Help & Support' },
   ];
-  
   return (
     <div className="w-64 bg-white h-full border-r border-gray-200 hidden md:block">
       <div className="h-full flex flex-col">
@@ -75,6 +86,7 @@ export const Sidebar: React.FC = () => {
                 to={item.to}
                 icon={item.icon}
                 text={item.text}
+                badge={item.to === '/notifications' ? unreadCount : undefined}
               />
             ))}
           </div>

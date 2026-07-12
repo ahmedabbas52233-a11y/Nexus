@@ -40,6 +40,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setOnlineUsers((prev) => ({ ...prev, [userId]: online }));
     });
 
+    socket.on('connect_error', (err) => {
+      // Most commonly an expired/invalid JWT. Logged rather than surfaced as a
+      // toast on every page, since REST calls will independently redirect to
+      // login once the token is actually rejected there.
+      console.warn('Socket connection failed:', err.message);
+    });
+
     socketRef.current = socket;
     forceRender((n) => n + 1);
 

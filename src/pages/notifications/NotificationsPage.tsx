@@ -1,152 +1,104 @@
-import React, { useState, useEffect } from 'react';
-import { Bell, MessageCircle, UserPlus, DollarSign, Check } from 'lucide-react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, MessageCircle, DollarSign, Phone, Check, Trash2 } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
-import { Avatar } from '../../components/ui/Avatar';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import toast from 'react-hot-toast';
+import { useNotifications, AppNotification } from '../../context/NotificationsContext';
 
-interface Notification {
-  id: number;
-  type: string;
-  user: {
-    name: string;
-    avatar: string;
-  };
-  content: string;
-  time: string;
-  unread: boolean;
-}
+const getIcon = (type: AppNotification['type']) => {
+  switch (type) {
+    case 'message':
+      return <MessageCircle size={16} className="text-primary-600" />;
+    case 'payment':
+      return <DollarSign size={16} className="text-accent-600" />;
+    case 'call':
+      return <Phone size={16} className="text-secondary-600" />;
+    default:
+      return <Bell size={16} className="text-gray-600" />;
+  }
+};
+
+const timeAgo = (iso: string): string => {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 export const NotificationsPage: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  useEffect(() => {
-    // For now, load from localStorage or show empty
-    // Backend notifications API not implemented yet
-    const loadNotifications = () => {
-      try {
-        const stored = localStorage.getItem('business_nexus_notifications');
-        if (stored) {
-          setNotifications(JSON.parse(stored));
-        }
-      } catch (err) {
-        console.error('Failed to load notifications:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadNotifications();
-  }, []);
-  
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'message': return <MessageCircle size={16} className="text-primary-600" />;
-      case 'connection': return <UserPlus size={16} className="text-secondary-600" />;
-      case 'investment': return <DollarSign size={16} className="text-accent-600" />;
-      default: return <Bell size={16} className="text-gray-600" />;
-    }
+  const { notifications, unreadCount, markAllAsRead, markAsRead, clearAll } = useNotifications();
+  const navigate = useNavigate();
+
+  const handleClick = (n: AppNotification) => {
+    markAsRead(n.id);
+    if (n.link) navigate(n.link);
   };
-  
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
-    localStorage.setItem('business_nexus_notifications', JSON.stringify(notifications.map(n => ({ ...n, unread: false }))));
-    toast.success('All notifications marked as read');
-  };
-  
-  const markAsRead = (id: number) => {
-    setNotifications(prev => {
-      const updated = prev.map(n => n.id === id ? { ...n, unread: false } : n);
-      localStorage.setItem('business_nexus_notifications', JSON.stringify(updated));
-      return updated;
-    });
-  };
-  
-  const unreadCount = notifications.filter(n => n.unread).length;
-  
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-gray-600">Stay updated with your network activity</p>
+          <p className="text-gray-600">
+            {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}` : 'You\'re all caught up'}
+          </p>
         </div>
-        
-        {unreadCount > 0 && (
-          <Button variant="outline" size="sm" onClick={markAllAsRead} leftIcon={<Check size={16} />}>
-            Mark all as read
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {unreadCount > 0 && (
+            <Button variant="outline" size="sm" leftIcon={<Check size={16} />} onClick={markAllAsRead}>
+              Mark all read
+            </Button>
+          )}
+          {notifications.length > 0 && (
+            <Button variant="ghost" size="sm" leftIcon={<Trash2 size={16} />} onClick={clearAll}>
+              Clear all
+            </Button>
+          )}
+        </div>
       </div>
-      
-      {loading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map(i => (
-            <Card key={i} className="animate-pulse">
-              <CardBody className="flex items-start p-4">
-                <div className="w-10 h-10 bg-gray-200 rounded-full mr-4" />
-                <div className="flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-1/4 mb-2" />
-                  <div className="h-3 bg-gray-200 rounded w-3/4" />
-                </div>
-              </CardBody>
-            </Card>
-          ))}
-        </div>
-      ) : notifications.length > 0 ? (
-        <div className="space-y-4">
-          {notifications.map(notification => (
-            <Card
-              key={notification.id}
-              className={`transition-colors duration-200 ${notification.unread ? 'bg-primary-50' : ''}`}
-            >
-              <CardBody className="flex items-start p-4">
-                <Avatar
-                  src={notification.user.avatar}
-                  alt={notification.user.name}
-                  size="md"
-                  className="flex-shrink-0 mr-4"
-                />
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">{notification.user.name}</span>
-                    {notification.unread && (
-                      <Badge variant="primary" size="sm" rounded>New</Badge>
-                    )}
+
+      <Card>
+        <CardBody className="p-0">
+          {notifications.length === 0 ? (
+            <div className="text-center py-16 px-6">
+              <div className="bg-gray-100 p-6 rounded-full inline-flex mb-4">
+                <Bell size={32} className="text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900">No notifications yet</h3>
+              <p className="text-gray-500 mt-1">
+                New messages, payment updates, and calls will show up here in real time.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {notifications.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={() => handleClick(n)}
+                  className={`w-full text-left flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors ${
+                    n.unread ? 'bg-primary-50/40' : ''
+                  }`}
+                >
+                  <div className="mt-1 p-2 rounded-full bg-gray-100">{getIcon(n.type)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                      {n.unread && <Badge variant="primary" size="sm">New</Badge>}
+                    </div>
+                    <p className="text-sm text-gray-600 truncate">{n.content}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{timeAgo(n.time)}</p>
                   </div>
-                  
-                  <p className="text-gray-600 mt-1">{notification.content}</p>
-                  
-                  <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
-                    {getNotificationIcon(notification.type)}
-                    <span>{notification.time}</span>
-                  </div>
-                </div>
-                
-                {notification.unread && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ml-2"
-                    onClick={() => markAsRead(notification.id)}
-                  >
-                    <Check size={16} />
-                  </Button>
-                )}
-              </CardBody>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-          <Bell size={48} className="mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900">No notifications yet</h3>
-          <p className="text-gray-500 mt-1">When you get messages or connection requests, they'll appear here</p>
-        </div>
-      )}
+                </button>
+              ))}
+            </div>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 };
