@@ -43,7 +43,7 @@ const App: FC = () => {
       <SocketProvider>
       <NotificationsProvider>
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-      <Router>
+      <Router basename={import.meta.env.BASE_URL}>
         <Routes>
           {/* Authentication Routes */}
           <Route path="/login" element={<LoginPage />} />
