@@ -1,7 +1,10 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const dbPath = path.join(__dirname, '..', 'nexus.db');
+// DB_PATH lets production point SQLite at a mounted persistent volume
+// (e.g. Fly.io volumes are mounted at /data - see fly.toml). Defaults to
+// backend/nexus.db for local development.
+const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'nexus.db');
 const db = new sqlite3.Database(dbPath);
 
 console.log('SQLite database connected at:', dbPath);

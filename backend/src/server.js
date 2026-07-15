@@ -12,7 +12,10 @@ const fs = require('fs');
 dotenv.config();
 
 // Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '..', 'uploads');
+// UPLOADS_DIR lets production point uploads at a mounted persistent volume
+// (e.g. Fly.io volumes are mounted at /data - see fly.toml). Defaults to
+// backend/uploads for local development.
+const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

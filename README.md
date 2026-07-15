@@ -123,8 +123,8 @@ Every feature that looks interactive in the UI is backed by a real API call — 
 | Email | Nodemailer (falls back to console logging in dev — no SMTP account required to test 2FA/password reset) |
 
 **Infrastructure**
-- Frontend deploys to **Vercel**
-- Backend deploys to **Render** (`render.yaml` + `Procfile` included)
+- Frontend deploys to **GitHub Pages** (`.github/workflows/deploy.yml` + `.github/workflows/ci.yml` included)
+- Backend deploys via **Docker** — works on Back4app Containers (no credit card required), Fly.io, or Render (`backend/Dockerfile`, `backend/render.yaml`, `backend/Procfile` all included, pick one)
 
 ## Architecture
 
@@ -289,15 +289,18 @@ Connect with `io(SOCKET_URL, { auth: { token: <jwt> } })`.
 
 ## Deployment
 
-**Backend (Render)** — `backend/render.yaml` and `backend/Procfile` are included. Push to GitHub, create a Render Blueprint (or manual Web Service with `npm install` / `node src/server.js`), set `JWT_SECRET` and `FRONTEND_URL`, deploy.
+**Backend — three options, pick based on whether you have a credit card:**
+- **No card:** [Back4app Containers](https://www.back4app.com) — deploys from `backend/Dockerfile`, free tier with no card at signup. Recommended default.
+- **Have a card, want it free:** Render — `backend/render.yaml` + `backend/Procfile`, a one-time $1 verification hold but no ongoing charge on the free instance type.
+- **Have a card, want real persistent storage:** Fly.io — same `backend/Dockerfile`, add a volume with `fly volumes create`, real usage-based billing.
 
-**Frontend (Vercel)** — `vercel.json` is included. Set `VITE_API_URL` and `VITE_SOCKET_URL` to your deployed Render URL as Vercel environment variables, then deploy.
+**Frontend (GitHub Pages)** — `.github/workflows/deploy.yml` builds and deploys `dist/` automatically on push to `main`. Set `VITE_API_URL` and `VITE_SOCKET_URL` as GitHub Actions repo secrets (Settings → Secrets and variables → Actions) pointing at your deployed backend URL, then push/re-run the workflow. `.github/workflows/ci.yml` runs type-check/lint/build/backend-smoke-test on every PR.
 
-Full step-by-step instructions are in [`backend/README.md`](backend/README.md#deployment-render).
+Full step-by-step instructions for all three backend options are in [`backend/README.md`](backend/README.md#deployment).
 
 ## Known limitations
 
-- **Uploaded documents live on local disk**, not S3. On ephemeral filesystems (Render free tier) files are lost on redeploy/restart — fine for a demo, not for durable production use.
+- **Uploaded documents and the SQLite database live on local disk**, not S3/a managed database. On platforms with an ephemeral filesystem (Render free tier, and possibly Back4app's free tier — unconfirmed) files/data are lost on redeploy/restart. Fly.io with a mounted volume is the only one of the three deployment options with confirmed real persistence. Fine for a demo either way, not for durable production use without upgrading this.
 - **WebRTC has no TURN server**, only public STUN. Calls work reliably on the same network or straightforward NATs; some symmetric/corporate NATs may fail to connect.
 - **Payments are a simulated sandbox**, not a live Stripe/PayPal integration — intentional, matching the "mock integration" scope of the project.
 - **2FA/password-reset emails** print to the server console unless real SMTP credentials are configured.

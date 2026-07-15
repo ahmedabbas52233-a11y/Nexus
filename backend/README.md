@@ -75,16 +75,42 @@ Connect with `io(SOCKET_URL, { auth: { token: <jwt> } })`. The server authentica
 - Password reset via time-limited, hashed single-use tokens (not stored in plaintext).
 - Optional email-based 2FA.
 
-## Deployment (Render)
+## Deployment
+
+Three deployment paths are documented. **Back4app Containers is recommended if you don't have a credit card** — Render and Fly.io both require one (Render: a $1 temporary authorization hold, no ongoing charge on the free instance type; Fly.io: real usage-based billing, no free tier as of 2024).
+
+### Option A — Back4app Containers (no credit card required)
+
+Deploys straight from `backend/Dockerfile` via GitHub. Free tier: 256MB RAM, 0.25 CPU, 600 active hours/month, no card at signup.
+
+1. Push this repo to GitHub (the `backend/Dockerfile` and `.dockerignore` are already set up).
+2. Sign up at [back4app.com](https://www.back4app.com) → **Containers as a Service**.
+3. **Create new app** → connect your GitHub account → select the `Nexus` repo.
+4. Set **Root Directory** to `backend` (the Dockerfile lives there, not at the repo root — the frontend is a separate app in the same repo).
+5. Back4app detects the `Dockerfile` automatically and builds from it.
+6. Set environment variables in the Back4app dashboard: `JWT_SECRET` (generate one: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`), `JWT_EXPIRE=7d`, `FRONTEND_URL` (your GitHub Pages URL), `NODE_ENV=production`. Don't set `PORT` — the platform injects it.
+7. Deploy. Note the resulting URL and confirm it's live by visiting `<url>/api/health`.
+8. Point the frontend at it: set `VITE_API_URL=<url>/api` and `VITE_SOCKET_URL=<url>` as GitHub Actions repo secrets (Settings → Secrets and variables → Actions), then re-run the deploy workflow.
+
+⚠️ **Storage caveat:** we haven't been able to confirm whether Back4app's free container tier includes a persistent volume. The `Dockerfile` writes the SQLite DB and uploads to `/data` regardless, so if the platform does wipe the container filesystem on redeploy/restart, expect data loss there just like Render's free tier — same limitation, different platform. Worth testing directly: deploy, register a user, trigger a redeploy, and see if that user still exists.
+
+### Option B — Render (needs a card, but no ongoing charge on Free tier)
 
 A `render.yaml` and `Procfile` are included.
 
 1. Push this repo to GitHub.
-2. In Render: New → Blueprint → point at the repo (uses `render.yaml`), or New → Web Service manually with build command `npm install` and start command `node src/server.js`.
-3. Set environment variables in the Render dashboard: `JWT_SECRET` (or let Render auto-generate it), `FRONTEND_URL` (your Vercel URL), optionally `SMTP_*`.
+2. In Render: New → Blueprint → point at the repo (uses `render.yaml`), or New → Web Service manually with **Root Directory** `backend`, build command `npm install`, start command `node src/server.js`.
+3. Set environment variables in the Render dashboard: `JWT_SECRET` (or let Render auto-generate it), `FRONTEND_URL` (your GitHub Pages URL), optionally `SMTP_*`.
 4. Deploy. Note the resulting URL, e.g. `https://nexus-backend.onrender.com`.
-5. In the frontend, set `VITE_API_URL=https://nexus-backend.onrender.com/api` and `VITE_SOCKET_URL=https://nexus-backend.onrender.com` as Vercel environment variables, then redeploy the frontend.
+5. Point the frontend at it the same way as Option A step 8.
+6. Same ephemeral-filesystem caveat as above on the free instance type.
+
+### Option C — Fly.io (needs a card, real usage-based billing)
+
+Deploys from the same `backend/Dockerfile`. Install `flyctl`, run `fly launch` from the `backend/` directory (it'll detect the Dockerfile), `fly volumes create nexus_data --size 1` for real persistent storage mounted at `/data` (matching the Dockerfile's `DB_PATH`/`UPLOADS_DIR`), then `fly deploy`. This is the only one of the three with confirmed real persistent storage on a small paid tier.
 
 ## Database
 
 SQLite via the `sqlite3` package (async, callback-based API — not `better-sqlite3`). Tables: `users`, `profiles`, `meetings`, `documents`, `transactions`, `messages`. Schema is created and lightly migrated (new columns added if missing) automatically on server start in `src/database.js`. No separate migration step is required.
+
+`DB_PATH` and `UPLOADS_DIR` env vars override where the database file and uploaded documents are written (defaulting to `backend/nexus.db` and `backend/uploads/` for local dev) — used to point at a mounted volume path in production. See `src/database.js` and `src/server.js`.
